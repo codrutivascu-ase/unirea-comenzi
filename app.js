@@ -38,7 +38,27 @@ var S = {
   tot: CATALOG_BAZA.slice(), catalog: CATALOG_BAZA.slice(), active: CATALOG_BAZA.slice(),
   categorii: CATEGORII_BAZA.slice(),
   timer: null, ceas: null, confirmaFinal: false,
+  conectat: null, ultimaSinc: null,
   alertat: {}, confirmaSterg: null, istoric: [], istoricDeschis: null
+};
+
+/* Ce nu a putut pleca spre server ramane aici si se retrimite singur.
+   Pe o linie de magazin cade semnalul des; comanda nu are voie sa se piarda. */
+var Coada = {
+  cheie: "unirea_coada_v1",
+  tot: function () {
+    try { return JSON.parse(localStorage.getItem(this.cheie) || "{}"); }
+    catch (e) { return {}; }
+  },
+  pune: function (doc) {
+    var q = this.tot(); q[doc.id] = doc;
+    try { localStorage.setItem(this.cheie, JSON.stringify(q)); } catch (e) {}
+  },
+  scoate: function (id) {
+    var q = this.tot(); delete q[id];
+    try { localStorage.setItem(this.cheie, JSON.stringify(q)); } catch (e) {}
+  },
+  marime: function () { return Object.keys(this.tot()).length; }
 };
 
 /* ------------------------------------------------------------------ Store */
@@ -81,12 +101,31 @@ var Store = {
     Object.keys(tot).forEach(function (k) { if (tot[k].sesiune === sesiune) out.push(tot[k]); });
     return Promise.resolve(out);
   },
-  salveaza: function (doc) {
-    if (this.mod === "supabase") return this._upsert("comenzi", doc);
+  salveaza: function (doc, faraCoada) {
+    // pastram mereu si o copie locala, ca sa nu depindem de retea
     var tot = this._citesteLocal(this.cheieComenzi);
     tot[doc.id] = doc;
     this._scrieLocal(this.cheieComenzi, tot);
-    return Promise.resolve();
+    if (this.mod !== "supabase") return Promise.resolve();
+    return this._upsert("comenzi", doc).then(function () {
+      if (!faraCoada) Coada.scoate(doc.id);
+      stareRetea(true);
+    }).catch(function (e) {
+      if (!faraCoada) Coada.pune(doc);
+      stareRetea(false);
+      throw e;
+    });
+  },
+  trimiteCoada: function () {
+    if (this.mod !== "supabase") return Promise.resolve(0);
+    var q = Coada.tot(), ids = Object.keys(q), self = this;
+    if (!ids.length) return Promise.resolve(0);
+    return Promise.all(ids.map(function (id) {
+      return self._upsert("comenzi", q[id]).then(function () { Coada.scoate(id); return 1; })
+        .catch(function () { return 0; });
+    })).then(function (rez) {
+      return rez.reduce(function (a, b) { return a + b; }, 0);
+    });
   },
   recente: function (magazin) {
     if (this.mod === "supabase") {
@@ -201,7 +240,10 @@ function salveazaCatalog() {
 
 /* ------------------------------------------------------------- sincronizare */
 function incarca() {
-  return Store.citesteSetare("runda").then(function (r) {
+  return Store.trimiteCoada().then(function (trimise) {
+    if (trimise) toast(trimise + (trimise === 1 ? " modificare trimisă" : " modificări trimise"));
+    return Store.citesteSetare("runda");
+  }).then(function (r) {
     var rundaNoua = (r && r.n) || 1;
     var schimbata = S.runda !== null && S.runda !== rundaNoua;
     S.runda = rundaNoua;
@@ -212,7 +254,8 @@ function incarca() {
     }
     return Store.citeste(sesiuneKey());
   }).then(function (randuri) {
-    if (randuri === null) { toast("Nu am putut citi comenzile. Verific conexiunea."); return; }
+    if (randuri === null) { stareRetea(false); deseneaza(); return; }
+    stareRetea(true);
     var noi = {};
     randuri.forEach(function (v) { if (v && v.magazin) noi[v.magazin] = v; });
     // nu pierde ce tocmai a tastat cineva pe acest telefon
@@ -251,7 +294,8 @@ function scrie(mag) {
       status: c.status || "draft", linii: c.linii || {}, altele: c.altele || [],
       modificat: modificat, actualizat: acum
     };
-    Store.salveaza(doc).catch(function () { toast("Nu s-a putut salva. Încerc din nou la următoarea modificare."); });
+    Store.salveaza(doc).catch(function () { scrieStare(); });
+    scrieStare();
   }, 450);
 }
 function seteazaLinie(mag, nr, camp, val) {
@@ -273,9 +317,40 @@ function deseneaza() {
   $("depozitView").hidden = S.rol !== "depozit";
   $("actiuni").hidden = !S.rol;
   scrieInfoRunda();
+  scrieStare();
   if (S.rol === "magazin") deseneazaMagazin();
   else if (S.rol === "depozit") deseneazaDepozit();
   else deseneazaGate();
+}
+
+function stareRetea(ok) {
+  S.conectat = ok;
+  if (ok) S.ultimaSinc = new Date().toISOString();
+  scrieStare();
+}
+function scrieStare() {
+  var el = $("stareSync");
+  if (!el) return;
+  var nes = Coada.marime();
+  if (Store.mod !== "supabase") {
+    el.className = "stare local";
+    el.textContent = "salvat pe telefon";
+    return;
+  }
+  if (nes) {
+    el.className = "stare rau";
+    el.textContent = nes + (nes === 1 ? " modificare netrimisă" : " modificări netrimise");
+  } else if (S.conectat === false) {
+    el.className = "stare rau";
+    el.textContent = "fără conexiune";
+  } else {
+    el.className = "stare bun";
+    el.textContent = "sincronizat" + (S.ultimaSinc ? " " + doarOra(S.ultimaSinc) : "");
+  }
+}
+function doarOra(iso) {
+  try { return new Date(iso).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" }); }
+  catch (e) { return ""; }
 }
 
 function scrieInfoRunda() {
@@ -1185,6 +1260,8 @@ function incarcaFrecvente() {
 }
 
 window.addEventListener("hashchange", function () { citesteHash(); porneste(); });
+window.addEventListener("online", function () { incarca(); });
+window.addEventListener("offline", function () { stareRetea(false); });
 
 /* ------------------------------------------------------------------ pornire */
 Store.init();

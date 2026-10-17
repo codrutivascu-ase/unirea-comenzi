@@ -38,6 +38,15 @@ Pe telefon: deschizi linkul în Chrome (Android) sau Safari (iPhone) → meniu �
 
 ## Ce urmează
 
-1. Supabase, ca să se sincronizeze între magazine și depozit.
-2. Aviz PDF în formatul actual („Notă de comandă / Dispoziție de livrare").
-3. Integrare SmartBill: avizul emis direct din aplicație.
+1. **Supabase** — pasul care face aplicația utilizabilă în două locuri deodată.
+   Instrucțiuni în [docs/SUPABASE.md](docs/SUPABASE.md).
+2. **Aviz PDF** în formatul actual („Notă de comandă / Dispoziție de livrare").
+3. **Integrare SmartBill**: avizul emis direct din aplicație.
+4. **Parolă pe depozit**, când nu mai vrem ca oricine cu linkul să poată finaliza o comandă.
+
+## Ce se întâmplă când cade internetul
+
+Comanda se scrie întâi pe telefon și abia apoi pleacă spre server. Dacă nu are semnal,
+modificarea rămâne într-o coadă și se retrimite singură — la revenirea semnalului, la
+următoarea modificare sau la fiecare verificare automată. În antet scrie tot timpul cum
+stă treaba: „sincronizat 18:42", „2 modificări netrimise" sau „fără conexiune".
