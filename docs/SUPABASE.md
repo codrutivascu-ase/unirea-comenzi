@@ -14,22 +14,33 @@ Durează cam 10 minute și e gratuit pentru volumul nostru.
 ```sql
 create table comenzi (
   id          text primary key,
-  sesiune     text not null,
-  data        date not null,
-  tura        text not null,
+  sesiune     text not null,          -- comanda curenta, ex. "r7"
+  runda       integer,
+  data        date not null default current_date,
   magazin     text not null,
   status      text not null default 'draft',
   linii       jsonb not null default '{}'::jsonb,
+  altele      jsonb not null default '[]'::jsonb,
   actualizat  timestamptz not null default now()
 );
 
 create index comenzi_sesiune_idx on comenzi (sesiune);
 create index comenzi_magazin_idx on comenzi (magazin, actualizat desc);
 
-alter table comenzi enable row level security;
+-- runda deschisa si catalogul de produse, controlate din depozit
+create table setari (
+  id          text primary key,
+  valoare     jsonb not null,
+  actualizat  timestamptz not null default now()
+);
 
--- faza de test: oricine are linkul poate citi si scrie comenzi
+alter table comenzi enable row level security;
+alter table setari  enable row level security;
+
+-- faza de test: oricine are linkul poate citi si scrie
 create policy "acces aplicatie" on comenzi
+  for all using (true) with check (true);
+create policy "acces setari" on setari
   for all using (true) with check (true);
 ```
 
@@ -55,4 +66,5 @@ Aplicația trece singură din „mod local" în mod sincronizat — se vede pe e
 ## 4. Verificare
 
 Deschide `#kaufland` pe un telefon și `#depozit` pe altul. Ce scrie magazinul
-apare la depozit în maximum 8 secunde.
+apare la depozit în maximum 8 secunde. Apasă „Finalizează” la depozit si cosul
+magazinului se goleste pentru comanda urmatoare.

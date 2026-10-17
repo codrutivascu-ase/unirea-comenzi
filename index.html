@@ -149,6 +149,25 @@ input.liv.modificat{border-color:var(--aur);background:var(--aur-soft)}
 .cos-cap p{margin:4px 0 0;color:var(--brand-dark);font-size:13.5px}
 .cos-cant{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-weight:600;flex:none}
 
+/* ---- runda curenta, pagina implicita, catalog ---- */
+.runda{font-size:12.5px;color:var(--muted)}
+.runda b{color:var(--ink);font-weight:700}
+.implicit{margin-top:22px;text-align:left}
+.implicit .et{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.implicit .chips{margin-top:7px}
+.catalog-rand{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.catalog-rand .info{flex:1;min-width:0}
+.catalog-rand.stins .nume{color:var(--muted);text-decoration:line-through}
+.comuta{border:1px solid var(--line-tare);background:var(--bg);border-radius:999px;width:52px;height:30px;position:relative;flex:none;padding:0}
+.comuta::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--muted);transition:transform .15s ease,background .15s ease}
+.comuta[aria-pressed="true"]{background:var(--brand-soft);border-color:var(--brand)}
+.comuta[aria-pressed="true"]::after{transform:translateX(22px);background:var(--brand)}
+.form-produs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;background:var(--surface);
+  border:1px dashed var(--line-tare);border-radius:14px;padding:12px}
+.form-produs input,.form-produs select{border:1px solid var(--line-tare);border-radius:10px;padding:10px 11px;min-width:0}
+.form-produs .lat{grid-column:1 / -1}
+.confirma{background:var(--aur-soft);border-color:var(--aur);color:#7a5a12}
+
 /* ---- ecran de intrare ---- */
 .gate{max-width:520px;margin:0 auto;padding-block:36px 24px;text-align:center}
 .gate img.logo{width:104px;height:104px;margin-bottom:14px}
@@ -191,11 +210,7 @@ main{padding-bottom:120px}
       <button class="btn mic" id="btnIesire" type="button" title="Schimbă rolul">&#9776;</button>
     </div>
     <div class="sesiune">
-      <input type="date" id="dataLivrare" aria-label="Data livrării">
-      <div class="seg" id="segTura">
-        <button type="button" data-tura="t1">Prânz</button>
-        <button type="button" data-tura="t2">Dimineață</button>
-      </div>
+      <span class="runda" id="infoRunda">Se încarcă...</span>
     </div>
   </div>
   <div class="progres"><i id="progresBar"></i></div>
@@ -214,8 +229,12 @@ main{padding-bottom:120px}
       <span>Magazin Bistrița <small>introduce comanda zilnică</small></span><span class="sag">&rarr;</span>
     </a>
     <a href="#depozit" class="dep">
-      <span>Depozit <small>centralizator de producție și livrare</small></span><span class="sag">&rarr;</span>
+      <span>Depozit <small>centralizator, livrare și catalog</small></span><span class="sag">&rarr;</span>
     </a>
+    <div class="implicit">
+      <span class="et">Deschide aplicația direct pe</span>
+      <div class="chips" id="rolImplicit"></div>
+    </div>
     <p class="nota" id="notaMod">Se încarcă...</p>
   </section>
 
