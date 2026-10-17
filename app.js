@@ -37,7 +37,8 @@ var S = {
   cfg: { dezactivate: [], sterse: [], extra: [] },
   tot: CATALOG_BAZA.slice(), catalog: CATALOG_BAZA.slice(), active: CATALOG_BAZA.slice(),
   categorii: CATEGORII_BAZA.slice(),
-  timer: null, ceas: null, confirmaFinal: false
+  timer: null, ceas: null, confirmaFinal: false,
+  alertat: {}, confirmaSterg: null, istoric: [], istoricDeschis: null
 };
 
 /* ------------------------------------------------------------------ Store */
@@ -125,8 +126,10 @@ function azi() { return new Date().toISOString().slice(0, 10); }
 function sesiuneKey() { return "r" + (S.runda || 1); }
 function docId(mag) { return sesiuneKey() + "_" + mag; }
 function oraRo(iso) {
-  try { return new Date(iso).toLocaleString("ro-RO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
-  catch (e) { return ""; }
+  try {
+    return new Date(iso).toLocaleString("ro-RO",
+      { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch (e) { return ""; }
 }
 function comandaMea() { return S.comenzi[S.magazin] || null; }
 function liniiDin(c) { return (c && c.linii) || {}; }
@@ -163,6 +166,7 @@ function schimbaStatus(mag, status) {
   var c = S.comenzi[mag];
   if (!c) return;
   c.status = status; c._local = true;
+  if (status === "finalizata") c.modificat = null;
   S.comenzi[mag] = c;
   scrie(mag);
 }
@@ -224,6 +228,9 @@ function porneste() {
   Store.citesteSetare("produse").then(function (cfg) {
     if (cfg) S.cfg = { dezactivate: cfg.dezactivate || [], sterse: cfg.sterse || [], extra: cfg.extra || [] };
     recalculeazaCatalog();
+    return Store.citesteSetare("istoric");
+  }).then(function (ist) {
+    S.istoric = ist || [];
     return incarca();
   });
   if (Store.mod === "supabase") {
@@ -235,10 +242,14 @@ function scrie(mag) {
   S.timer = setTimeout(function () {
     var c = S.comenzi[mag];
     if (!c) return;
+    var acum = new Date().toISOString();
+    // daca magazinul mai adauga ceva dupa ce depozitul a finalizat, lasam un semn
+    var modificat = c.modificat || null;
+    if (S.rol === "magazin" && c.status === "finalizata") modificat = acum;
     var doc = {
       id: docId(mag), sesiune: sesiuneKey(), data: azi(), runda: S.runda, magazin: mag,
       status: c.status || "draft", linii: c.linii || {}, altele: c.altele || [],
-      actualizat: new Date().toISOString()
+      modificat: modificat, actualizat: acum
     };
     Store.salveaza(doc).catch(function () { toast("Nu s-a putut salva. Încerc din nou la următoarea modificare."); });
   }, 450);
@@ -250,7 +261,7 @@ function seteazaLinie(mag, nr, camp, val) {
   if (val === null || val === "" || isNaN(val) || val < 0) delete l[camp]; else l[camp] = val;
   if (Object.keys(l).length) linii[nr] = l; else delete linii[nr];
   S.comenzi[mag] = { status: c.status || "draft", linii: linii, altele: c.altele || [],
-    magazin: mag, sesiune: sesiuneKey(), _local: true };
+    modificat: c.modificat || null, magazin: mag, sesiune: sesiuneKey(), _local: true };
   scrie(mag);
 }
 
@@ -269,9 +280,9 @@ function deseneaza() {
 
 function scrieInfoRunda() {
   if (!S.runda) return;
-  var t = "Comanda <b>#" + S.runda + "</b>";
-  if (S.deschisaLa) t += " · deschisă " + oraRo(S.deschisaLa);
-  $("infoRunda").innerHTML = t;
+  $("infoRunda").innerHTML = S.deschisaLa
+    ? "Comandă deschisă <b>" + oraRo(S.deschisaLa) + "</b>"
+    : "<b>Comandă deschisă</b>";
 }
 
 function deseneazaGate() {
@@ -539,8 +550,8 @@ function deseneazaCos() {
   var cap = document.createElement("div"); cap.className = "cos-cap";
   var h = document.createElement("h2"); h.textContent = "Verifică comanda";
   var p = document.createElement("p");
-  p.textContent = n + (n === 1 ? " produs" : " produse") + " în comanda #" + S.runda +
-    ". Mai poți schimba cantitățile aici.";
+  p.textContent = n + (n === 1 ? " produs" : " produse") +
+    " în comanda curentă. Mai poți schimba cantitățile aici.";
   cap.appendChild(h); cap.appendChild(p);
   lista.appendChild(cap);
 
@@ -587,7 +598,7 @@ function actualizeazaSumar() {
   var c = comandaMea();
   var n = pozitiiComanda(c);
   $("sumar").innerHTML = "<b>" + n + (n === 1 ? " produs" : " produse") + "</b>" +
-    (S.pas === "cos" ? "verifică și trimite" : "în comanda #" + S.runda);
+    (S.pas === "cos" ? "verifică și trimite" : "în comanda curentă");
   $("progresBar").style.width = Math.min(100, (n / 12) * 100) + "%";
   var princ = $("btnPrincipal"), sec = $("btnSecundar");
   var trimisa = !!(c && c.status && c.status !== "draft");
@@ -616,7 +627,7 @@ function deseneazaDepozit() {
   $("progresBar").style.width = ((gata || trimise) / CHEI.length) * 100 + "%";
 
   var carduri = $("statusMagazine"); carduri.innerHTML = "";
-  carduri.hidden = S.depTab === "catalog";
+  carduri.hidden = (S.depTab === "catalog" || S.depTab === "istoric");
   CHEI.forEach(function (id) {
     var c = S.comenzi[id];
     var d = document.createElement("div");
@@ -637,15 +648,25 @@ function deseneazaDepozit() {
   var tabs = $("depTabs"); tabs.innerHTML = "";
   var file = [["centralizator", "Centralizator"]]
     .concat(CHEI.map(function (k) { return [k, MAGAZINE[k]]; }))
-    .concat([["catalog", "Produse"]]);
+    .concat([["catalog", "Produse"], ["istoric", "Istoric"]]);
   file.forEach(function (pair) {
     var b = document.createElement("button"); b.className = "chip"; b.type = "button"; b.textContent = pair[1];
     b.setAttribute("aria-pressed", String(S.depTab === pair[0]));
-    b.onclick = function () { S.depTab = pair[0]; S.confirmaFinal = false; deseneazaDepozit(); };
+    b.onclick = function () {
+      S.depTab = pair[0]; S.confirmaFinal = false; S.confirmaSterg = null;
+      deseneazaDepozit();
+    };
     tabs.appendChild(b);
   });
 
+  avertizeazaModificari();
+
   var zona = $("depozitContinut"); zona.innerHTML = "";
+  if (S.depTab === "istoric") {
+    zona.appendChild(ecranIstoric());
+    princBtnIstoric();
+    return;
+  }
   if (S.depTab === "catalog") {
     zona.appendChild(ecranCatalog());
   } else {
@@ -666,12 +687,11 @@ function deseneazaDepozit() {
   var areCereri = cerute().length > 0 || CHEI.some(function (m) { return alteleDin(S.comenzi[m]).length; });
 
   if (S.depTab === "centralizator") {
-    princ.textContent = S.confirmaFinal ? "Sigur? Apasă din nou" :
-      ("Livrează comanda #" + S.runda);
+    princ.textContent = S.confirmaFinal ? "Sigur? Apasă din nou" : "Livrează comanda";
     princ.className = "btn primary" + (S.confirmaFinal ? " confirma" : "");
     princ.disabled = !toateFinalizate();
     sec.hidden = false;
-    sec.textContent = "Copiază";
+    sec.textContent = "Copiază pentru SmartBill";
     sec.className = "btn";
     sec.disabled = !areCereri;
   } else {
@@ -679,12 +699,44 @@ function deseneazaDepozit() {
     princ.textContent = fin ? ("Reeditează " + MAGAZINE[S.depTab]) : ("Finalizează " + MAGAZINE[S.depTab]);
     princ.className = "btn" + (fin ? "" : " primary");
     princ.disabled = !S.comenzi[S.depTab];
-    sec.hidden = false;
-    sec.textContent = "Copiază pentru SmartBill";
-    sec.className = "btn";
-    sec.disabled = !S.comenzi[S.depTab];
+    sec.hidden = true;
   }
   sumarDepozit();
+}
+
+/* Magazinele pot adauga si dupa ce depozitul a finalizat: aratam asta clar. */
+function avertizeazaModificari() {
+  var ban = $("avertisment");
+  var vinovate = CHEI.filter(function (m) {
+    return esteFinalizata(m) && S.comenzi[m] && S.comenzi[m].modificat;
+  });
+  if (!vinovate.length) { ban.hidden = true; ban.innerHTML = ""; return; }
+  ban.hidden = false;
+  ban.innerHTML = "";
+  var txt = document.createElement("span");
+  txt.textContent = vinovate.map(function (m) { return MAGAZINE[m]; }).join(" și ") +
+    (vinovate.length > 1 ? " au adăugat" : " a adăugat") + " ceva după finalizare (" +
+    oraRo(S.comenzi[vinovate[0]].modificat) + ").";
+  var b = document.createElement("button");
+  b.type = "button";
+  b.textContent = "Vezi " + MAGAZINE[vinovate[0]];
+  b.onclick = function () { S.depTab = vinovate[0]; S.confirmaFinal = false; deseneazaDepozit(); };
+  ban.appendChild(txt); ban.appendChild(b);
+  vinovate.forEach(function (m) {
+    var t = S.comenzi[m].modificat;
+    if (S.alertat[m] !== t) {
+      S.alertat[m] = t;
+      toast(MAGAZINE[m] + " a mai adăugat ceva după finalizare");
+    }
+  });
+}
+
+function princBtnIstoric() {
+  var princ = $("btnPrincipal"), sec = $("btnSecundar");
+  princ.textContent = "Înapoi la comandă";
+  princ.className = "btn primary"; princ.disabled = false;
+  sec.hidden = true;
+  $("sumar").innerHTML = "<b>Istoric</b>comenzile livrate";
 }
 
 function sumarDepozit() {
@@ -695,20 +747,106 @@ function sumarDepozit() {
 
 function finalizeazaRunda() {
   var urmatoare = (S.runda || 1) + 1;
-  Store.scrieSetare("runda", { n: urmatoare, deschisaLa: new Date().toISOString() }).then(function () {
+  var acum = new Date().toISOString();
+  var intrare = { r: S.runda, t: acum, m: {} };
+  CHEI.forEach(function (m) {
+    var c = S.comenzi[m];
+    if (!c) return;
+    intrare.m[m] = { p: pozitiiComanda(c), v: Math.round(valoare(liniiDin(c), "l") * 100) / 100 };
+  });
+  copiaza(tsvLivrare());
+  var istoric = [intrare].concat(S.istoric || []).slice(0, 60);
+  Store.scrieSetare("istoric", istoric).then(function () {
+    S.istoric = istoric;
+    return Store.scrieSetare("runda", { n: urmatoare, deschisaLa: acum });
+  }).then(function () {
     S.confirmaFinal = false;
     S.comenzi = {};
+    S.alertat = {};
     return incarca();
   }).then(function () {
-    toast("Comandă livrată. S-a deschis comanda #" + S.runda + ".");
+    toast("Comandă livrată · exportul e copiat pentru SmartBill");
   }).catch(function () { toast("Nu am putut finaliza. Încearcă din nou."); });
+}
+
+/* ------------------------------------------------------------------ istoric */
+function ecranIstoric() {
+  var zona = document.createElement("div");
+  if (!S.istoric || !S.istoric.length) {
+    zona.appendChild(goliciune("Nicio comandă livrată încă. Aici vor apărea, cu data și ora livrării."));
+    return zona;
+  }
+  S.istoric.forEach(function (it) {
+    var card = document.createElement("div"); card.className = "istoric-rand";
+    var cap = document.createElement("button");
+    cap.type = "button"; cap.className = "istoric-cap";
+    var st = document.createElement("span"); st.className = "istoric-data";
+    st.textContent = oraRo(it.t);
+    var sub = document.createElement("span"); sub.className = "sub";
+    sub.textContent = CHEI.map(function (m) {
+      var d = (it.m || {})[m];
+      return MAGAZINE[m] + ": " + (d ? d.p + " produse" : "–");
+    }).join("   •   ");
+    var stanga = document.createElement("span"); stanga.className = "info";
+    stanga.appendChild(st); stanga.appendChild(sub);
+    var sag = document.createElement("span"); sag.className = "sag";
+    sag.textContent = S.istoricDeschis === it.r ? "▴" : "▾";
+    cap.appendChild(stanga); cap.appendChild(sag);
+    cap.onclick = function () {
+      S.istoricDeschis = (S.istoricDeschis === it.r ? null : it.r);
+      deseneazaDepozit();
+    };
+    card.appendChild(cap);
+    if (S.istoricDeschis === it.r) {
+      var loc = document.createElement("div"); loc.className = "istoric-detaliu";
+      loc.textContent = "Se încarcă...";
+      card.appendChild(loc);
+      Store.citeste("r" + it.r).then(function (randuri) {
+        loc.innerHTML = "";
+        if (!randuri || !randuri.length) { loc.textContent = "Comenzile nu mai sunt în baza de date."; return; }
+        randuri.forEach(function (c) {
+          var h = document.createElement("div"); h.className = "altele-tit";
+          h.textContent = MAGAZINE[c.magazin] || c.magazin;
+          loc.appendChild(h);
+          loc.appendChild(tabelIstoric(c));
+        });
+      });
+    }
+    zona.appendChild(card);
+  });
+  return zona;
+}
+
+function tabelIstoric(c) {
+  var linii = liniiDin(c);
+  var box = document.createElement("div"); box.className = "tabela";
+  var tab = document.createElement("table");
+  tab.innerHTML = '<thead><tr><th>Produs</th><th class="num">Cerut buc</th>' +
+    '<th class="num">Livrat</th><th>U/M</th></tr></thead>';
+  var tb = document.createElement("tbody");
+  S.tot.forEach(function (p) {
+    var l = linii[p.nr] || {};
+    if (!(l.s > 0 || l.l > 0)) return;
+    var tr = document.createElement("tr");
+    tr.innerHTML = "<td>" + p.nume + '</td><td class="num">' + cant(l.s || 0) + "</td>" +
+      '<td class="num">' + (l.l != null ? cant(l.l) : "–") + "</td><td>" + p.um + "</td>";
+    tb.appendChild(tr);
+  });
+  alteleDin(c).forEach(function (it) {
+    var tr = document.createElement("tr");
+    tr.innerHTML = "<td>" + it.t + '</td><td class="num">' + cant(it.s || 1) + "</td>" +
+      '<td class="num">–</td><td>Buc</td>';
+    tb.appendChild(tr);
+  });
+  tab.appendChild(tb); box.appendChild(tab);
+  return box;
 }
 
 /* ------------------------------------------------------- catalogul de produse */
 function ecranCatalog() {
   var zona = document.createElement("div");
   var intro = document.createElement("p"); intro.className = "nota";
-  intro.textContent = "Produsele stinse nu mai apar la magazine, dar rămân în comenzile vechi. Cele adăugate aici apar imediat la ambele magazine.";
+  intro.textContent = "Comutatorul stins scoate produsul din lista magazinelor. Un produs stins poate fi apoi șters definitiv cu ✕. Produsele adăugate aici apar imediat la ambele magazine.";
   zona.appendChild(intro);
 
   S.categorii.forEach(function (catg) {
@@ -736,43 +874,28 @@ function ecranCatalog() {
         salveazaCatalog().then(function () { deseneazaDepozit(); });
       };
       rand.appendChild(info); rand.appendChild(com);
-      var sterge = document.createElement("button");
-      sterge.className = "sterge"; sterge.type = "button"; sterge.textContent = "✕";
-      sterge.setAttribute("aria-label", "Scoate din listă: " + p.nume);
-      sterge.onclick = function () {
-        S.cfg.sterse = (S.cfg.sterse || []).concat([p.nr]);
-        salveazaCatalog().then(function () { deseneazaDepozit(); });
-        toast("Am scos „" + p.nume + "” din listă");
-      };
-      rand.appendChild(sterge);
+      // stergerea definitiva e posibila doar dupa ce produsul a fost stins
+      if (!activ) {
+        var intreaba = S.confirmaSterg === p.nr;
+        var sterge = document.createElement("button");
+        sterge.type = "button";
+        sterge.className = intreaba ? "btn mic confirma" : "sterge";
+        sterge.textContent = intreaba ? "Sigur ștergi?" : "✕";
+        sterge.setAttribute("aria-label", "Șterge din listă: " + p.nume);
+        sterge.onclick = function () {
+          if (!intreaba) { S.confirmaSterg = p.nr; deseneazaDepozit(); return; }
+          S.cfg.sterse = (S.cfg.sterse || []).concat([p.nr]);
+          S.cfg.extra = (S.cfg.extra || []).filter(function (e) { return e.nr !== p.nr; });
+          S.confirmaSterg = null;
+          salveazaCatalog().then(function () { deseneazaDepozit(); });
+          toast("Am șters „" + p.nume + "” din listă");
+        };
+        rand.appendChild(sterge);
+      }
       sec.appendChild(rand);
     });
     zona.appendChild(sec);
   });
-
-  var sterse = (S.cfg.sterse || []).map(produsDupaNr).filter(Boolean);
-  if (sterse.length) {
-    var det = document.createElement("details"); det.className = "sterse";
-    var sum = document.createElement("summary");
-    sum.textContent = "Scoase din listă (" + sterse.length + ")";
-    det.appendChild(sum);
-    sterse.forEach(function (p) {
-      var rand = document.createElement("div"); rand.className = "catalog-rand stins";
-      var info = document.createElement("div"); info.className = "info";
-      var nume = document.createElement("div"); nume.className = "nume"; nume.textContent = p.nume;
-      var sub = document.createElement("div"); sub.className = "sub"; sub.textContent = p.categorie + "  •  " + p.um;
-      info.appendChild(nume); info.appendChild(sub);
-      var pune = document.createElement("button");
-      pune.className = "btn mic"; pune.type = "button"; pune.textContent = "Pune înapoi";
-      pune.onclick = function () {
-        S.cfg.sterse = (S.cfg.sterse || []).filter(function (nr) { return nr !== p.nr; });
-        salveazaCatalog().then(function () { deseneazaDepozit(); });
-      };
-      rand.appendChild(info); rand.appendChild(pune);
-      det.appendChild(rand);
-    });
-    zona.appendChild(det);
-  }
 
   zona.appendChild(formularProdusNou());
   return zona;
@@ -825,7 +948,7 @@ function formularProdusNou() {
 /* ------------------------------------------------------------------ tabele */
 function tabelCentralizator() {
   var produse = cerute();
-  if (!produse.length) return goliciune("Niciun magazin nu a cerut încă ceva pentru comanda #" + S.runda + ".");
+  if (!produse.length) return goliciune("Niciun magazin nu a cerut încă ceva pentru comanda curentă.");
   var box = document.createElement("div"); box.className = "tabela";
   var h = "<table><thead><tr><th>Produs</th>";
   CHEI.forEach(function (m) { h += '<th class="num">' + MAGAZINE[m] + "</th>"; });
@@ -865,7 +988,7 @@ function tabelMagazin(mag) {
   var linii = liniiDin(S.comenzi[mag]);
   var blocat = esteFinalizata(mag);
   var produse = S.tot.filter(function (p) { var l = linii[p.nr] || {}; return l.s > 0 || l.l > 0; });
-  if (!produse.length) return goliciune(MAGAZINE[mag] + " nu a trimis încă nimic pentru comanda #" + S.runda + ".");
+  if (!produse.length) return goliciune(MAGAZINE[mag] + " nu a trimis încă nimic pentru comanda curentă.");
   var box = document.createElement("div"); box.className = "tabela" + (blocat ? " blocat" : "");
   if (blocat) {
     var nt = document.createElement("p"); nt.className = "tabela-tit";
@@ -962,44 +1085,32 @@ function copiaza(text) {
     );
   } else { toast("Nu am putut copia"); }
 }
-function tsvCentralizator() {
-  var rows = [["Produs"].concat(CHEI.map(function (m) { return MAGAZINE[m] + " (buc)"; }),
-    ["Total buc", "Livrat", "U/M", "Pret"]).join("\t")];
-  cerute().forEach(function (p) {
-    var q = CHEI.map(function (m) { return (liniiDin(S.comenzi[m])[p.nr] || {}).s || 0; });
-    var t = q.reduce(function (a, b) { return a + b; }, 0);
-    var liv = CHEI.reduce(function (a, m) {
-      var l = liniiDin(S.comenzi[m])[p.nr] || {};
-      return a + (l.l != null ? l.l : 0);
-    }, 0);
-    rows.push([p.nume].concat(q, [t, liv || "", p.um, p.pret != null ? p.pret.toFixed(2) : ""]).join("\t"));
-  });
+/* Un singur export, cu magazinul pe fiecare rand: se filtreaza usor in Excel
+   si se poate imparti pe avize. */
+function tsvLivrare() {
+  var rows = [["Magazin", "Produs", "Cerut buc", "Cantitate livrata", "U/M", "Pret unitar", "Valoare"].join("\t")];
   CHEI.forEach(function (m) {
-    alteleDin(S.comenzi[m]).forEach(function (it) {
-      rows.push([it.t + " (" + MAGAZINE[m] + ")", "", "", it.s || 1, "", "buc", ""].join("\t"));
+    var linii = liniiDin(S.comenzi[m]);
+    S.tot.forEach(function (p) {
+      var l = linii[p.nr] || {};
+      if (!(l.s > 0 || l.l > 0)) return;
+      var q = (l.l != null ? l.l : "");
+      rows.push([MAGAZINE[m], p.nume, l.s || "", q, p.um,
+        p.pret != null ? p.pret.toFixed(2) : "",
+        (q === "" || p.pret == null ? "" : (q * p.pret).toFixed(2))].join("\t"));
     });
-  });
-  return rows.join("\n");
-}
-function tsvMagazin(mag) {
-  var linii = liniiDin(S.comenzi[mag]);
-  var rows = [["Produs", "Cerut buc", "Cantitate livrata", "U/M", "Pret unitar", "Valoare"].join("\t")];
-  S.tot.forEach(function (p) {
-    var l = linii[p.nr] || {};
-    if (!(l.s > 0 || l.l > 0)) return;
-    var q = (l.l != null ? l.l : "");
-    rows.push([p.nume, l.s || "", q, p.um, p.pret != null ? p.pret.toFixed(2) : "",
-      (q === "" || p.pret == null ? "" : (q * p.pret).toFixed(2))].join("\t"));
-  });
-  alteleDin(S.comenzi[mag]).forEach(function (it) {
-    rows.push([it.t, it.s || 1, "", "buc", "", ""].join("\t"));
+    alteleDin(S.comenzi[m]).forEach(function (it) {
+      rows.push([MAGAZINE[m], it.t, it.s || 1, "", "buc", "", ""].join("\t"));
+    });
   });
   return rows.join("\n");
 }
 
 $("btnPrincipal").onclick = function () {
   if (S.rol === "depozit") {
-    if (S.depTab === "catalog") { S.depTab = "centralizator"; deseneazaDepozit(); return; }
+    if (S.depTab === "catalog" || S.depTab === "istoric") {
+      S.depTab = "centralizator"; deseneazaDepozit(); return;
+    }
     if (S.depTab === "centralizator") {
       if (!S.confirmaFinal) { S.confirmaFinal = true; deseneazaDepozit(); return; }
       finalizeazaRunda();
@@ -1036,7 +1147,7 @@ $("btnPrincipal").onclick = function () {
 };
 $("btnSecundar").onclick = function () {
   if (S.rol === "depozit") {
-    copiaza(S.depTab === "centralizator" ? tsvCentralizator() : tsvMagazin(S.depTab));
+    copiaza(tsvLivrare());
     return;
   }
   if (S.rol !== "magazin") return;

@@ -176,6 +176,13 @@ input.liv.modificat{border-color:var(--aur);background:var(--aur-soft)}
 details.sterse{margin-top:18px;border-top:1px solid var(--line);padding-top:10px}
 details.sterse summary{cursor:pointer;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:6px 0}
 details.sterse .catalog-rand{border-bottom:1px solid var(--line)}
+.istoric-rand{border:1px solid var(--line);border-radius:14px;margin-top:10px;background:var(--bg);overflow:hidden}
+.istoric-cap{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;padding:13px 14px;text-align:left}
+.istoric-cap .info{flex:1;min-width:0;display:flex;flex-direction:column}
+.istoric-data{font-weight:700}
+.istoric-cap .sag{color:var(--muted)}
+.istoric-detaliu{padding:0 14px 14px}
+.istoric-detaliu .altele-tit{margin-top:10px}
 
 /* ---- ecran de intrare ---- */
 .gate{max-width:520px;margin:0 auto;padding-block:36px 24px;text-align:center}
@@ -232,10 +239,10 @@ main{padding-bottom:120px}
     <h1>Comenzi către depozit</h1>
     <p class="lead">Alege de unde intri. Salvează linkul pe ecranul telefonului și îl deschizi ca pe o aplicație.</p>
     <a href="#kaufland">
-      <span>Magazin Kaufland <small>introduce comanda zilnică</small></span><span class="sag">&rarr;</span>
+      <span>Magazin Kaufland <small>introdu comanda</small></span><span class="sag">&rarr;</span>
     </a>
     <a href="#bistrita">
-      <span>Magazin Bistrița <small>introduce comanda zilnică</small></span><span class="sag">&rarr;</span>
+      <span>Magazin Bistrița <small>introdu comanda</small></span><span class="sag">&rarr;</span>
     </a>
     <a href="#depozit" class="dep">
       <span>Depozit <small>centralizator, livrare și catalog</small></span><span class="sag">&rarr;</span>
@@ -259,6 +266,7 @@ main{padding-bottom:120px}
   </main>
 
   <main id="depozitView" hidden>
+    <div class="banner" id="avertisment" hidden></div>
     <div class="carduri" id="statusMagazine"></div>
     <div class="chips" id="depTabs"></div>
     <div id="depozitContinut"></div>
