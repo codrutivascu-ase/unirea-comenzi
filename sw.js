@@ -1,8 +1,8 @@
 /* Service worker: tine aplicatia deschisa si fara semnal.
    Schimba VERSIUNE la fiecare modificare, ca telefoanele sa ia codul nou. */
-var VERSIUNE = "ug-comenzi-v12";
+var VERSIUNE = "ug-comenzi-v13";
 var FISIERE = [
-  "./", "./index.html", "./app.js?v=12", "./produse.js?v=12", "./config.js?v=12",
+  "./", "./index.html", "./app.js?v=13", "./produse.js?v=13", "./config.js?v=13",
   "./manifest.webmanifest",
   "./assets/logo.png", "./assets/favicon.png", "./assets/icon-192.png",
   "./assets/icon-512.png", "./assets/apple-touch-icon.png"

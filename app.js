@@ -41,7 +41,8 @@ var S = {
   conectat: null, ultimaSinc: null,
   alertat: {}, confirmaSterg: null, istoric: [], istoricDeschis: null,
   istoricDate: {}, istoricEdit: null, confirmaStergIstoric: null,
-  scrisLa: {}, pendinte: {}, semnatura: null, redesenAmanat: false, baza: {}
+  scrisLa: {}, pendinte: {}, semnatura: null, redesenAmanat: false, baza: {},
+  trimis: {}
 };
 
 /* Ce nu a putut pleca spre server ramane aici si se retrimite singur.
@@ -282,6 +283,12 @@ function incarca() {
       var alNostruAjuns = rem && S.scrisLa[m] && rem.actualizat >= S.scrisLa[m];
       if (S.pendinte[m] || !alNostruAjuns) noi[m] = local;
     });
+    // magazinul lucreaza pe ciorna lui pana o trimite
+    if (S.rol === "magazin") {
+      var ciorna = citesteDraft(S.magazin);
+      if (ciorna) { ciorna._local = true; noi[S.magazin] = ciorna; }
+      if (S.trimis[S.magazin] == null) S.trimis[S.magazin] = citesteTrimis(S.magazin);
+    }
     S.comenzi = noi;
     retineBaza();
     var semn = JSON.stringify(noi) + "|" + S.runda + "|" + S.rol + "|" + S.magazin + "|" + S.pas;
@@ -305,7 +312,46 @@ function porneste() {
     S.ceas = setInterval(function () { if (!document.hidden) incarca(); }, 8000);
   }
 }
+/* Comanda magazinului sta pe telefon pana cand vanzatoarea apasa "Trimite".
+   Asa depozitul nu vede cantitatile pe jumatate scrise. */
+function cheieDraft(mag) { return "unirea_draft_" + sesiuneKey() + "_" + mag; }
+function cheieTrimis(mag) { return "unirea_trimis_" + sesiuneKey() + "_" + mag; }
+function continut(c) {
+  var l = {};
+  var linii = liniiDin(c);
+  Object.keys(linii).forEach(function (nr) { if (linii[nr].s > 0) l[nr] = linii[nr].s; });
+  return JSON.stringify({ l: l, a: alteleDin(c), n: notaDin(c) });
+}
+function salveazaDraft(mag) {
+  try { localStorage.setItem(cheieDraft(mag), JSON.stringify(S.comenzi[mag])); } catch (e) {}
+}
+function stergeDraft(mag) {
+  try { localStorage.removeItem(cheieDraft(mag)); } catch (e) {}
+}
+function citesteDraft(mag) {
+  try { return JSON.parse(localStorage.getItem(cheieDraft(mag)) || "null"); }
+  catch (e) { return null; }
+}
+function citesteTrimis(mag) {
+  try { return localStorage.getItem(cheieTrimis(mag)); } catch (e) { return null; }
+}
+function noteazaTrimis(mag, semn) {
+  S.trimis[mag] = semn;
+  try { localStorage.setItem(cheieTrimis(mag), semn); } catch (e) {}
+}
+function areNetrimise(c) {
+  if (!c) return false;
+  var acum = continut(c);
+  if (acum === continut(null)) return false;          // nimic in cos
+  return acum !== (S.trimis[S.magazin] || null);
+}
+
 function scrie(mag) {
+  if (S.rol === "magazin") {        // ramane pe telefon pana la trimitere
+    salveazaDraft(mag);
+    scrieStare();
+    return;
+  }
   clearTimeout(S.timer);
   S.timer = setTimeout(function () {
     var c = S.comenzi[mag];
@@ -399,6 +445,52 @@ function schimbatLa(mag, nr) {
   return "";
 }
 
+/* La trimitere luam versiunea de pe server, ca sa nu stergem cantitatile
+   completate de depozit la livrat, si punem peste ea ce a cerut magazinul. */
+function trimiteComanda(mag) {
+  var c = S.comenzi[mag];
+  if (!c) return Promise.resolve();
+  return Store.citeste(sesiuneKey()).then(function (randuri) {
+    var rem = null;
+    (randuri || []).forEach(function (r) { if (r && r.magazin === mag) rem = r; });
+    var linii = {};
+    var ale = liniiDin(c);
+    Object.keys(ale).forEach(function (nr) { if (ale[nr].s > 0) linii[nr] = { s: ale[nr].s }; });
+    var remL = liniiDin(rem);
+    Object.keys(remL).forEach(function (nr) {
+      if (remL[nr].l != null) {
+        linii[nr] = linii[nr] || {};
+        linii[nr].l = remL[nr].l;
+      }
+    });
+    var acum = new Date().toISOString();
+    var finalizata = !!(rem && rem.status === "finalizata");
+    var doc = {
+      id: docId(mag), sesiune: sesiuneKey(), data: azi(), runda: S.runda, magazin: mag,
+      status: finalizata ? "finalizata" : "trimisa",
+      linii: linii, altele: alteleDin(c), actualizat: acum
+    };
+    if (finalizata) doc.modificat = acum;          // depozitul trebuie anuntat
+    if (notaDin(c)) doc.nota = notaDin(c);
+    var semn = continut(c);
+    S.pendinte[mag] = true;
+    return Store.salveaza(doc).then(function () {
+      S.pendinte[mag] = false;
+      S.scrisLa[mag] = acum;
+      noteazaTrimis(mag, semn);
+      stergeDraft(mag);
+      doc._local = false;
+      S.comenzi[mag] = doc;
+      scrieStare();
+    }).catch(function (e) {
+      S.pendinte[mag] = false;
+      noteazaTrimis(mag, semn);     // a intrat in coada, pleaca singura
+      scrieStare();
+      throw e;
+    });
+  });
+}
+
 /* ------------------------------------------------------------------ desenat */
 function tastezaCineva() {
   var a = document.activeElement;
@@ -438,6 +530,11 @@ function scrieStare() {
   var el = $("stareSync");
   if (!el) return;
   var nes = Coada.marime();
+  if (S.rol === "magazin" && !nes && areNetrimise(S.comenzi[S.magazin])) {
+    el.className = "stare rau";
+    el.textContent = "netrimisă";
+    return;
+  }
   if (Store.mod !== "supabase") {
     el.className = "stare local";
     el.textContent = "salvat pe telefon";
@@ -507,10 +604,16 @@ function deseneazaMagazin() {
   $("titlu").textContent = MAGAZINE[S.magazin];
   var c = comandaMea(), linii = liniiDin(c);
   var stare = (c && c.status) || "draft";
+  var netrimise = areNetrimise(c);
   var pill = $("statusPill");
   pill.hidden = false;
-  pill.textContent = stare === "finalizata" ? "Preluată" : (stare === "trimisa" ? "Trimisă" : "În lucru");
-  pill.className = "pill" + (stare === "draft" ? " asteapta" : " trimisa");
+  if (netrimise) {
+    pill.textContent = stare === "draft" ? "Netrimisă" : "Modificată";
+    pill.className = "pill asteapta";
+  } else {
+    pill.textContent = stare === "finalizata" ? "Preluată" : (stare === "trimisa" ? "Trimisă" : "În lucru");
+    pill.className = "pill" + (stare === "draft" ? " asteapta" : " trimisa");
+  }
   $("progresBar").style.width = Math.min(100, (pozitiiComanda(c) / 12) * 100) + "%";
 
   if (S.pas === "cos") { deseneazaCos(); return; }
@@ -799,17 +902,21 @@ function actualizeazaSumar() {
   if (S.rol !== "magazin") return;
   var c = comandaMea();
   var n = pozitiiComanda(c);
+  var trimisa = !!(c && c.status && c.status !== "draft");
+  var netrimise = areNetrimise(c);
+  var stareText = netrimise
+    ? (trimisa ? "modificări netrimise" : "încă nu a plecat la depozit")
+    : (trimisa ? "trimisă la depozit" : "în comanda curentă");
   $("sumar").innerHTML = "<b>" + n + (n === 1 ? " produs" : " produse") + "</b>" +
-    (S.pas === "cos" ? "verifică și trimite" : "în comanda curentă");
+    (S.pas === "cos" ? "verifică și trimite" : stareText);
   $("progresBar").style.width = Math.min(100, (n / 12) * 100) + "%";
   var princ = $("btnPrincipal"), sec = $("btnSecundar");
-  var trimisa = !!(c && c.status && c.status !== "draft");
   princ.className = "btn primary";
   sec.className = "btn";
   sec.disabled = false;
   if (S.pas === "cos") {
     princ.textContent = trimisa ? "Retrimite comanda" : "Trimite comanda";
-    princ.disabled = n === 0;
+    princ.disabled = n === 0 || (trimisa && !netrimise);
     sec.hidden = false; sec.textContent = "Înapoi la listă";
   } else {
     princ.textContent = "Vezi coșul" + (n ? " · " + n : "");
@@ -1466,12 +1573,20 @@ $("btnPrincipal").onclick = function () {
     deseneazaMagazin();
     return;
   }
+  var mag = S.magazin;
+  var eraTrimisa = !!(c.status && c.status !== "draft");
   c.status = "trimisa";
-  scrie(S.magazin);
+  salveazaDraft(mag);
+  trimiteComanda(mag).then(function () {
+    deseneazaMagazin();
+    toast(eraTrimisa ? "Comandă retrimisă către depozit" : "Comandă trimisă către depozit");
+  }).catch(function () {
+    deseneazaMagazin();
+    toast("Fără conexiune — comanda pleacă singură când revine semnalul");
+  });
   S.pas = "lista";
   window.scrollTo(0, 0);
   deseneazaMagazin();
-  toast("Comandă trimisă către depozit");
 };
 $("btnSecundar").onclick = function () {
   if (S.rol === "depozit") {
