@@ -133,6 +133,21 @@ input.liv.modificat{border-color:var(--aur);background:var(--aur-soft)}
 .dif{font-weight:700;color:var(--rosu)}
 .dif.zero{font-weight:400;color:var(--muted)}
 .gol{padding:26px 16px;text-align:center;color:var(--muted)}
+.tabela-tit{margin:0;padding:11px 12px 0;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700}
+
+/* ---- altele (text liber) ---- */
+.altele{margin-top:10px;background:var(--surface);border:1px dashed var(--line-tare);border-radius:14px;padding:12px}
+.altele-tit{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px}
+.altele .rand:last-of-type{border-bottom:0}
+.altele .adauga{display:flex;gap:8px;margin-top:10px}
+.altele .adauga input{flex:1;min-width:0;border:1px solid var(--line-tare);border-radius:10px;padding:10px 12px}
+.sterge{border:0;background:transparent;color:var(--muted);font-size:16px;padding:6px 2px;flex:none}
+
+/* ---- cosul ---- */
+.cos-cap{margin-top:16px;background:var(--brand-soft);border-radius:14px;padding:14px 16px}
+.cos-cap h2{font-size:19px}
+.cos-cap p{margin:4px 0 0;color:var(--brand-dark);font-size:13.5px}
+.cos-cant{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-weight:600;flex:none}
 
 /* ---- ecran de intrare ---- */
 .gate{max-width:520px;margin:0 auto;padding-block:36px 24px;text-align:center}
@@ -205,12 +220,11 @@ main{padding-bottom:120px}
   </section>
 
   <main id="magazinView" hidden>
-    <div class="bar">
+    <div class="bar" id="bara">
       <label class="search">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         <input id="cauta" type="search" placeholder="Caută produs..." aria-label="Caută produs">
       </label>
-      <button class="btn mic" id="copiazaAnterioara" type="button">Ca ieri</button>
     </div>
     <div class="chips" id="categorii"></div>
     <div id="lista"></div>
