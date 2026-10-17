@@ -39,7 +39,8 @@ var S = {
   categorii: CATEGORII_BAZA.slice(),
   timer: null, ceas: null, confirmaFinal: false,
   conectat: null, ultimaSinc: null,
-  alertat: {}, confirmaSterg: null, istoric: [], istoricDeschis: null
+  alertat: {}, confirmaSterg: null, istoric: [], istoricDeschis: null,
+  istoricDate: {}, istoricEdit: null, confirmaStergIstoric: null
 };
 
 /* Ce nu a putut pleca spre server ramane aici si se retrimite singur.
@@ -127,6 +128,15 @@ var Store = {
       return rez.reduce(function (a, b) { return a + b; }, 0);
     });
   },
+  sterge: function (id) {
+    var tot = this._citesteLocal(this.cheieComenzi);
+    delete tot[id];
+    this._scrieLocal(this.cheieComenzi, tot);
+    if (this.mod !== "supabase") return Promise.resolve();
+    return fetch(this._url("comenzi", "?id=eq." + encodeURIComponent(id)), {
+      method: "DELETE", headers: this._head()
+    }).then(function (r) { if (!r.ok) throw new Error("stergere esuata"); });
+  },
   recente: function (magazin) {
     if (this.mod === "supabase") {
       return fetch(this._url("comenzi", "?select=*&magazin=eq." + encodeURIComponent(magazin) + "&order=actualizat.desc&limit=12"), { headers: this._head() })
@@ -173,6 +183,7 @@ function oraRo(iso) {
 function comandaMea() { return S.comenzi[S.magazin] || null; }
 function liniiDin(c) { return (c && c.linii) || {}; }
 function alteleDin(c) { return (c && c.altele) || []; }
+function notaDin(c) { return (c && c.nota) || ""; }
 function produsDupaNr(nr) {
   for (var i = 0; i < S.tot.length; i++) if (S.tot[i].nr === Number(nr)) return S.tot[i];
   return null;
@@ -295,6 +306,7 @@ function scrie(mag) {
       actualizat: acum
     };
     if (modificat) doc.modificat = modificat;
+    if (c.nota) doc.nota = c.nota;
     Store.salveaza(doc).catch(function () { scrieStare(); });
     scrieStare();
   }, 450);
@@ -306,7 +318,8 @@ function seteazaLinie(mag, nr, camp, val) {
   if (val === null || val === "" || isNaN(val) || val < 0) delete l[camp]; else l[camp] = val;
   if (Object.keys(l).length) linii[nr] = l; else delete linii[nr];
   S.comenzi[mag] = { status: c.status || "draft", linii: linii, altele: c.altele || [],
-    modificat: c.modificat || null, magazin: mag, sesiune: sesiuneKey(), _local: true };
+    nota: c.nota || "", modificat: c.modificat || null,
+    magazin: mag, sesiune: sesiuneKey(), _local: true };
   scrie(mag);
 }
 
@@ -403,6 +416,7 @@ function deseneazaMagazin() {
   var c = comandaMea(), linii = liniiDin(c);
   var stare = (c && c.status) || "draft";
   var pill = $("statusPill");
+  pill.hidden = false;
   pill.textContent = stare === "finalizata" ? "Preluată" : (stare === "trimisa" ? "Trimisă" : "În lucru");
   pill.className = "pill" + (stare === "draft" ? " asteapta" : " trimisa");
   $("progresBar").style.width = Math.min(100, (pozitiiComanda(c) / 12) * 100) + "%";
@@ -559,6 +573,25 @@ function salveazaAltele(arr) {
   S.comenzi[S.magazin] = c;
   scrie(S.magazin);
 }
+function salveazaNota(text) {
+  var c = S.comenzi[S.magazin] || { status: "draft", linii: {} };
+  c.nota = text; c._local = true;
+  S.comenzi[S.magazin] = c;
+  scrie(S.magazin);
+}
+function blocNota(c) {
+  var box = document.createElement("div"); box.className = "nota-bloc";
+  var tit = document.createElement("label"); tit.className = "altele-tit";
+  tit.setAttribute("for", "notaText");
+  tit.textContent = "Mesaj pentru depozit";
+  var ta = document.createElement("textarea");
+  ta.id = "notaText"; ta.rows = 3;
+  ta.placeholder = "ex. brânza de ieri a venit prea sărată; trimiteți mai devreme, avem inventar";
+  ta.value = notaDin(c);
+  ta.oninput = function () { salveazaNota(ta.value); };
+  box.appendChild(tit); box.appendChild(ta);
+  return box;
+}
 function blocAltele(c) {
   var arr = alteleDin(c);
   var box = document.createElement("div"); box.className = "altele";
@@ -666,6 +699,7 @@ function deseneazaCos() {
     g.textContent = "Coșul este gol. Întoarce-te la listă și pune cantitățile.";
     lista.appendChild(g);
   }
+  lista.appendChild(blocNota(c));
   actualizeazaSumar();
 }
 
@@ -696,11 +730,8 @@ function actualizeazaSumar() {
 function deseneazaDepozit() {
   $("titlu").textContent = "Depozit";
   var gata = CHEI.filter(function (m) { return esteFinalizata(m); }).length;
-  var trimise = CHEI.filter(function (m) { return S.comenzi[m] && S.comenzi[m].status !== "draft"; }).length;
-  var pill = $("statusPill");
-  pill.textContent = gata ? gata + "/" + CHEI.length + " finalizate" : trimise + "/" + CHEI.length + " trimise";
-  pill.className = "pill" + ((gata || trimise) === CHEI.length ? " trimisa" : " asteapta");
-  $("progresBar").style.width = ((gata || trimise) / CHEI.length) * 100 + "%";
+  $("statusPill").hidden = true;
+  $("progresBar").style.width = (gata / CHEI.length) * 100 + "%";
 
   var carduri = $("statusMagazine"); carduri.innerHTML = "";
   carduri.hidden = (S.depTab === "catalog" || S.depTab === "istoric");
@@ -746,8 +777,13 @@ function deseneazaDepozit() {
   if (S.depTab === "catalog") {
     zona.appendChild(ecranCatalog());
   } else {
+    var magsAici = (S.depTab === "centralizator" ? CHEI : [S.depTab]);
+    magsAici.forEach(function (m) {
+      var nt = notaDin(S.comenzi[m]);
+      if (nt) zona.appendChild(randNota(nt, MAGAZINE[m]));
+    });
     zona.appendChild(S.depTab === "centralizator" ? tabelCentralizator() : tabelMagazin(S.depTab));
-    var sp = tabelAltele(S.depTab === "centralizator" ? CHEI : [S.depTab]);
+    var sp = tabelAltele(magsAici);
     if (sp) zona.appendChild(sp);
   }
 
@@ -760,16 +796,11 @@ function deseneazaDepozit() {
     $("sumar").innerHTML = "<b>" + S.active.length + " produse active</b>din " + S.catalog.length + " în listă";
     return;
   }
-  var areCereri = cerute().length > 0 || CHEI.some(function (m) { return alteleDin(S.comenzi[m]).length; });
-
   if (S.depTab === "centralizator") {
     princ.textContent = S.confirmaFinal ? "Sigur? Apasă din nou" : "Livrează comanda";
     princ.className = "btn primary" + (S.confirmaFinal ? " confirma" : "");
     princ.disabled = !toateFinalizate();
-    sec.hidden = false;
-    sec.textContent = "Copiază pentru SmartBill";
-    sec.className = "btn";
-    sec.disabled = !areCereri;
+    sec.hidden = true;
   } else {
     var fin = esteFinalizata(S.depTab);
     princ.textContent = fin ? ("Reeditează " + MAGAZINE[S.depTab]) : ("Finalizează " + MAGAZINE[S.depTab]);
@@ -839,6 +870,7 @@ function finalizeazaRunda() {
     S.confirmaFinal = false;
     S.comenzi = {};
     S.alertat = {};
+    S.istoricDate = {};
     return incarca();
   }).then(function () {
     toast("Comandă livrată · exportul e copiat pentru SmartBill");
@@ -854,46 +886,121 @@ function ecranIstoric() {
   }
   S.istoric.forEach(function (it) {
     var card = document.createElement("div"); card.className = "istoric-rand";
+    var deschis = S.istoricDeschis === it.r;
+
     var cap = document.createElement("button");
     cap.type = "button"; cap.className = "istoric-cap";
-    var st = document.createElement("span"); st.className = "istoric-data";
-    st.textContent = oraRo(it.t);
+    var stanga = document.createElement("span"); stanga.className = "info";
+    var data = document.createElement("span"); data.className = "istoric-data";
+    data.textContent = oraRo(it.t);
     var sub = document.createElement("span"); sub.className = "sub";
     sub.textContent = CHEI.map(function (m) {
       var d = (it.m || {})[m];
       return MAGAZINE[m] + ": " + (d ? d.p + " produse" : "–");
     }).join("   •   ");
-    var stanga = document.createElement("span"); stanga.className = "info";
-    stanga.appendChild(st); stanga.appendChild(sub);
+    stanga.appendChild(data); stanga.appendChild(sub);
     var sag = document.createElement("span"); sag.className = "sag";
-    sag.textContent = S.istoricDeschis === it.r ? "▴" : "▾";
+    sag.textContent = deschis ? "▴" : "▾";
     cap.appendChild(stanga); cap.appendChild(sag);
     cap.onclick = function () {
-      S.istoricDeschis = (S.istoricDeschis === it.r ? null : it.r);
+      S.istoricDeschis = deschis ? null : it.r;
+      S.istoricEdit = null; S.confirmaStergIstoric = null;
       deseneazaDepozit();
     };
     card.appendChild(cap);
-    if (S.istoricDeschis === it.r) {
+
+    if (deschis) {
       var loc = document.createElement("div"); loc.className = "istoric-detaliu";
-      loc.textContent = "Se încarcă...";
       card.appendChild(loc);
-      Store.citeste("r" + it.r).then(function (randuri) {
-        loc.innerHTML = "";
-        if (!randuri || !randuri.length) { loc.textContent = "Comenzile nu mai sunt în baza de date."; return; }
-        randuri.forEach(function (c) {
-          var h = document.createElement("div"); h.className = "altele-tit";
-          h.textContent = MAGAZINE[c.magazin] || c.magazin;
-          loc.appendChild(h);
-          loc.appendChild(tabelIstoric(c));
+      var gata = S.istoricDate[it.r];
+      if (gata) deseneazaDetaliuIstoric(loc, it, gata);
+      else {
+        loc.textContent = "Se încarcă...";
+        Store.citeste("r" + it.r).then(function (randuri) {
+          var map = {};
+          (randuri || []).forEach(function (c) { if (c && c.magazin) map[c.magazin] = c; });
+          S.istoricDate[it.r] = map;
+          if (S.istoricDeschis === it.r) { loc.innerHTML = ""; deseneazaDetaliuIstoric(loc, it, map); }
         });
-      });
+      }
     }
     zona.appendChild(card);
   });
   return zona;
 }
 
-function tabelIstoric(c) {
+function deseneazaDetaliuIstoric(loc, it, map) {
+  loc.innerHTML = "";
+  var areCeva = CHEI.some(function (m) { return map[m]; });
+  if (!areCeva) {
+    var g = document.createElement("p"); g.className = "gol";
+    g.textContent = "Comenzile nu mai sunt în baza de date.";
+    loc.appendChild(g);
+  }
+  var editez = S.istoricEdit === it.r;
+
+  CHEI.forEach(function (m) {
+    var c = map[m];
+    if (!c) return;
+    var h = document.createElement("div"); h.className = "altele-tit";
+    h.textContent = MAGAZINE[m];
+    loc.appendChild(h);
+    if (notaDin(c)) loc.appendChild(randNota(notaDin(c), MAGAZINE[m]));
+    loc.appendChild(tabelIstoric(c, editez));
+  });
+
+  var bare = document.createElement("div"); bare.className = "istoric-butoane";
+
+  var smart = document.createElement("button");
+  smart.className = "btn mic primary"; smart.type = "button";
+  smart.textContent = "Trimite către SmartBill";
+  smart.onclick = function () { copiaza(tsvLivrare(map)); };
+  bare.appendChild(smart);
+
+  var edit = document.createElement("button");
+  edit.className = "btn mic"; edit.type = "button";
+  edit.textContent = editez ? "Gata, salvează" : "Editează";
+  edit.onclick = function () {
+    if (!editez) { S.istoricEdit = it.r; deseneazaDepozit(); return; }
+    var treaba = CHEI.filter(function (m) { return map[m] && map[m]._modificat; })
+      .map(function (m) {
+        var c = map[m]; delete c._modificat;
+        return Store.salveaza(c);
+      });
+    Promise.all(treaba).then(function () {
+      S.istoricEdit = null;
+      deseneazaDepozit();
+      toast(treaba.length ? "Modificările au fost salvate" : "Nu era nimic de salvat");
+    }).catch(function () { toast("Nu am putut salva. Verific conexiunea."); });
+  };
+  bare.appendChild(edit);
+
+  var intreaba = S.confirmaStergIstoric === it.r;
+  var sterge = document.createElement("button");
+  sterge.className = "btn mic" + (intreaba ? " confirma" : "");
+  sterge.type = "button";
+  sterge.textContent = intreaba ? "Sigur ștergi comanda?" : "Șterge";
+  sterge.onclick = function () {
+    if (!intreaba) { S.confirmaStergIstoric = it.r; deseneazaDepozit(); return; }
+    var treaba = CHEI.filter(function (m) { return map[m]; })
+      .map(function (m) { return Store.sterge(map[m].id); });
+    Promise.all(treaba).then(function () {
+      var istoric = S.istoric.filter(function (x) { return x.r !== it.r; });
+      return Store.scrieSetare("istoric", istoric).then(function () {
+        S.istoric = istoric;
+        delete S.istoricDate[it.r];
+        S.istoricDeschis = null; S.confirmaStergIstoric = null; S.istoricEdit = null;
+        deseneazaDepozit();
+        toast("Comanda a fost ștearsă din istoric");
+      });
+    }).catch(function () { toast("Nu am putut șterge. Verific conexiunea."); });
+  };
+  bare.appendChild(sterge);
+
+  loc.appendChild(bare);
+}
+
+function tabelIstoric(c, editabil) {
   var linii = liniiDin(c);
   var box = document.createElement("div"); box.className = "tabela";
   var tab = document.createElement("table");
@@ -904,8 +1011,25 @@ function tabelIstoric(c) {
     var l = linii[p.nr] || {};
     if (!(l.s > 0 || l.l > 0)) return;
     var tr = document.createElement("tr");
-    tr.innerHTML = "<td>" + p.nume + '</td><td class="num">' + cant(l.s || 0) + "</td>" +
-      '<td class="num">' + (l.l != null ? cant(l.l) : "–") + "</td><td>" + p.um + "</td>";
+    tr.innerHTML = "<td>" + p.nume + '</td><td class="num">' + cant(l.s || 0) + "</td>";
+    var tdL = document.createElement("td"); tdL.className = "num";
+    if (editabil) {
+      var inp = document.createElement("input");
+      inp.className = "liv"; inp.type = "number"; inp.inputMode = "decimal";
+      inp.min = "0"; inp.step = p.um === "Buc" ? "1" : "0.1";
+      inp.value = (l.l != null ? l.l : "");
+      inp.setAttribute("aria-label", "Livrat " + p.nume);
+      inp.oninput = function (e) {
+        var v = e.target.value === "" ? null : parseFloat(e.target.value);
+        if (v == null || isNaN(v)) delete linii[p.nr].l; else linii[p.nr].l = v;
+        c._modificat = true;
+      };
+      tdL.appendChild(inp);
+    } else {
+      tdL.textContent = (l.l != null ? cant(l.l) : "–");
+    }
+    var tdU = document.createElement("td"); tdU.textContent = p.um;
+    tr.appendChild(tdL); tr.appendChild(tdU);
     tb.appendChild(tr);
   });
   alteleDin(c).forEach(function (it) {
@@ -1060,6 +1184,15 @@ function tabelCentralizator() {
   return box;
 }
 
+function randNota(text, cine) {
+  var d = document.createElement("div"); d.className = "nota-mesaj";
+  var et = document.createElement("span"); et.className = "altele-tit";
+  et.textContent = "Mesaj de la " + cine;
+  var p = document.createElement("p"); p.textContent = text;
+  d.appendChild(et); d.appendChild(p);
+  return d;
+}
+
 function tabelMagazin(mag) {
   var linii = liniiDin(S.comenzi[mag]);
   var blocat = esteFinalizata(mag);
@@ -1163,10 +1296,11 @@ function copiaza(text) {
 }
 /* Un singur export, cu magazinul pe fiecare rand: se filtreaza usor in Excel
    si se poate imparti pe avize. */
-function tsvLivrare() {
+function tsvLivrare(sursa) {
+  var set = sursa || S.comenzi;
   var rows = [["Magazin", "Produs", "Cerut buc", "Cantitate livrata", "U/M", "Pret unitar", "Valoare"].join("\t")];
   CHEI.forEach(function (m) {
-    var linii = liniiDin(S.comenzi[m]);
+    var linii = liniiDin(set[m]);
     S.tot.forEach(function (p) {
       var l = linii[p.nr] || {};
       if (!(l.s > 0 || l.l > 0)) return;
@@ -1175,7 +1309,7 @@ function tsvLivrare() {
         p.pret != null ? p.pret.toFixed(2) : "",
         (q === "" || p.pret == null ? "" : (q * p.pret).toFixed(2))].join("\t"));
     });
-    alteleDin(S.comenzi[m]).forEach(function (it) {
+    alteleDin(set[m]).forEach(function (it) {
       rows.push([MAGAZINE[m], it.t, it.s || 1, "", "buc", "", ""].join("\t"));
     });
   });
@@ -1223,7 +1357,6 @@ $("btnPrincipal").onclick = function () {
 };
 $("btnSecundar").onclick = function () {
   if (S.rol === "depozit") {
-    copiaza(tsvLivrare());
     return;
   }
   if (S.rol !== "magazin") return;

@@ -22,6 +22,7 @@ create table comenzi (
   linii       jsonb not null default '{}'::jsonb,
   altele      jsonb not null default '[]'::jsonb,
   modificat   timestamptz,            -- magazinul a mai adaugat ceva dupa finalizare
+  nota        text,                   -- mesaj scris de magazin pentru depozit
   actualizat  timestamptz not null default now()
 );
 
@@ -46,7 +47,10 @@ create policy "acces setari" on setari
 ```
 
 > Dacă ai rulat o versiune mai veche a acestui fișier, adaugă coloana lipsă:
-> `alter table comenzi add column if not exists modificat timestamptz;`
+> ```sql
+> alter table comenzi add column if not exists modificat timestamptz;
+> alter table comenzi add column if not exists nota text;
+> ```
 
 > Politica de mai sus e potrivită pentru test, pentru că linkul e privat.
 > Când trecem pe lucru real punem autentificare pe magazin și înlocuim politica.
