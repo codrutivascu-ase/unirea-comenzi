@@ -13,6 +13,18 @@ var lei = function (n) { return n.toLocaleString("ro-RO", { minimumFractionDigit
 var cant = function (n) { return (Math.round(n * 1000) / 1000).toLocaleString("ro-RO", { maximumFractionDigits: 3 }); };
 var $ = function (id) { return document.getElementById(id); };
 
+/* Magazinul cere TOTDEAUNA in bucati (bucata, caserola, galeata), nu in kg.
+   Depozitul trece la livrare cantitatea reala, in unitatea de masura a produsului.
+   Produsele de mai jos se cer doar din 5 in 5. */
+var PAS_5 = { 13: true, 25: true };
+function pasCerere(p) { return PAS_5[p.nr] ? 5 : 1; }
+function rotunjestePas(p, v) {
+  if (v == null) return null;
+  var pas = pasCerere(p);
+  var r = Math.round(v / pas) * pas;
+  return r > 0 ? r : null;
+}
+
 var S = {
   rol: null, magazin: null, data: null, tura: "t2",
   filtru: "", categorie: "toate", comenzi: {}, depTab: "centralizator",
@@ -89,6 +101,9 @@ function comandaMea() { return S.comenzi[S.magazin] || null; }
 function liniiDin(c) { return (c && c.linii) || {}; }
 function valoare(linii, camp) {
   return PRODUSE.reduce(function (t, p) { var l = linii[p.nr]; var q = l && l[camp]; return t + (q ? q * p.pret : 0); }, 0);
+}
+function totalBucati(linii) {
+  return PRODUSE.reduce(function (t, p) { var l = linii[p.nr]; return t + ((l && l.s) || 0); }, 0);
 }
 function nrPozitii(linii, camp) {
   return PRODUSE.filter(function (p) { var l = linii[p.nr]; return l && l[camp] > 0; }).length;
@@ -226,7 +241,10 @@ function randProdus(p, l) {
   var nume = document.createElement("div"); nume.className = "nume"; nume.textContent = p.nume;
   var sub = document.createElement("div"); sub.className = "sub";
   var scrieSub = function (v) {
-    sub.textContent = lei(p.pret) + " lei/" + p.um + (v > 0 ? "   •   " + lei(v * p.pret) + " lei" : "");
+    var t = lei(p.pret) + " lei/" + p.um;
+    if (PAS_5[p.nr]) t += "   •   din 5 în 5";
+    if (v > 0) t += "   •   " + cant(v) + (v === 1 ? " bucată" : " bucăți");
+    sub.textContent = t;
   };
   scrieSub(l.s);
   info.appendChild(nume); info.appendChild(sub);
@@ -235,7 +253,7 @@ function randProdus(p, l) {
   var minus = document.createElement("button"); minus.type = "button"; minus.textContent = "−";
   minus.setAttribute("aria-label", "Scade " + p.nume);
   var inp = document.createElement("input");
-  inp.type = "number"; inp.inputMode = "decimal"; inp.min = "0"; inp.step = p.um === "Buc" ? "1" : "0.5";
+  inp.type = "number"; inp.inputMode = "numeric"; inp.min = "0"; inp.step = String(pasCerere(p));
   inp.id = "q" + p.nr; inp.placeholder = "0"; inp.value = (l.s != null ? l.s : "");
   inp.setAttribute("aria-label", p.nume);
   var plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+";
@@ -251,9 +269,9 @@ function randProdus(p, l) {
     actualizeazaSumar();
   };
   var pas = function (semn) {
-    var cur = parseFloat(inp.value) || 0;
-    var d = p.um === "Buc" ? 1 : (cur < 2 ? 0.5 : 1);
-    aplica(Math.round((cur + semn * d) * 100) / 100);
+    var d = pasCerere(p);
+    var cur = Math.round((parseFloat(inp.value) || 0) / d) * d;
+    aplica(cur + semn * d);
   };
   minus.onclick = function () { pas(-1); };
   plus.onclick = function () { pas(1); };
@@ -264,10 +282,16 @@ function randProdus(p, l) {
     scrieSub(v);
     actualizeazaSumar();
   };
+  // dupa ce termina de tastat, aducem cantitatea la pasul produsului
+  inp.onchange = function (e) {
+    var v = e.target.value === "" ? null : parseFloat(e.target.value);
+    var r = rotunjestePas(p, v);
+    if (r !== v) { aplica(r); if (v != null) toast(p.nume + " se cere din 5 în 5 — am pus " + cant(r || 0)); }
+  };
   inp.onfocus = function () { inp.select(); };
 
   st.appendChild(minus); st.appendChild(inp); st.appendChild(plus);
-  var um = document.createElement("span"); um.className = "um"; um.textContent = p.um;
+  var um = document.createElement("span"); um.className = "um"; um.textContent = "buc";
   rand.appendChild(info); rand.appendChild(st); rand.appendChild(um);
   return rand;
 }
@@ -275,8 +299,8 @@ function randProdus(p, l) {
 function actualizeazaSumar() {
   if (S.rol !== "magazin") return;
   var c = comandaMea(), linii = liniiDin(c);
-  var n = nrPozitii(linii, "s"), v = valoare(linii, "s");
-  $("sumar").innerHTML = "<b>" + n + " poziții</b>" + lei(v) + " lei";
+  var n = nrPozitii(linii, "s"), buc = totalBucati(linii);
+  $("sumar").innerHTML = "<b>" + n + " poziții</b>" + cant(buc) + " bucăți în total";
   $("progresBar").style.width = Math.min(100, (n / 12) * 100) + "%";
   var princ = $("btnPrincipal"), sec = $("btnSecundar");
   var trimisa = !!(c && c.status === "trimisa");
@@ -304,7 +328,7 @@ function deseneazaDepozit() {
     v.textContent = nrPozitii(linii, "s");
     var sm = document.createElement("small"); sm.textContent = " poziții"; v.appendChild(sm);
     var st = document.createElement("div"); st.className = "st";
-    st.textContent = lei(valoare(linii, "s")) + " lei  •  " + (c ? (c.status === "trimisa" ? "trimisă" : "în lucru") : "nimic încă");
+    st.textContent = cant(totalBucati(linii)) + " buc  •  " + (c ? (c.status === "trimisa" ? "trimisă" : "în lucru") : "nimic încă");
     d.appendChild(e); d.appendChild(v); d.appendChild(st);
     carduri.appendChild(d);
   });
@@ -327,18 +351,18 @@ function deseneazaDepozit() {
 }
 
 function sumarDepozit() {
-  var tS = CHEI.reduce(function (t, m) { return t + valoare(liniiDin(S.comenzi[m]), "s"); }, 0);
+  var tB = CHEI.reduce(function (t, m) { return t + totalBucati(liniiDin(S.comenzi[m])); }, 0);
   var tL = CHEI.reduce(function (t, m) { return t + valoare(liniiDin(S.comenzi[m]), "l"); }, 0);
-  $("sumar").innerHTML = "<b>" + lei(tS) + " lei</b>livrat " + lei(tL) + " lei";
+  $("sumar").innerHTML = "<b>" + cant(tB) + " bucăți cerute</b>livrat " + lei(tL) + " lei";
 }
 
 function tabelCentralizator() {
   var produse = cerute();
   if (!produse.length) return goliciune("Niciun magazin nu a cerut încă ceva pentru această livrare.");
   var box = document.createElement("div"); box.className = "tabela";
-  var h = "<table><thead><tr><th>Produs</th><th>U/M</th>";
+  var h = "<table><thead><tr><th>Produs</th>";
   CHEI.forEach(function (m) { h += '<th class="num">' + MAGAZINE[m] + "</th>"; });
-  h += '<th class="num">Total</th><th class="num">Livrat</th></tr></thead><tbody>';
+  h += '<th class="num">Total buc</th><th class="num">Livrat</th><th>U/M</th></tr></thead><tbody>';
   var tot = 0, catCurenta = null;
   produse.forEach(function (p) {
     if (p.categorie !== catCurenta) {
@@ -352,15 +376,20 @@ function tabelCentralizator() {
       return a + (l.l != null ? l.l : 0);
     }, 0);
     var areLiv = CHEI.some(function (m) { return (liniiDin(S.comenzi[m])[p.nr] || {}).l != null; });
-    tot += t * p.pret;
-    h += "<tr><td>" + p.nume + "</td><td>" + p.um + "</td>";
+    tot += liv * p.pret;
+    h += "<tr><td>" + p.nume + "</td>";
     q.forEach(function (v) { h += '<td class="num">' + (v ? cant(v) : "–") + "</td>"; });
     h += '<td class="num"><b>' + cant(t) + "</b></td>";
-    h += '<td class="num' + (areLiv && liv !== t ? " dif" : "") + '">' + (areLiv ? cant(liv) : "–") + "</td></tr>";
+    h += '<td class="num' + (areLiv ? " dif" : "") + '">' + (areLiv ? cant(liv) : "–") + "</td>";
+    h += "<td>" + p.um + "</td></tr>";
   });
-  h += '<tr class="total"><td>Valoare solicitată</td><td></td>';
-  CHEI.forEach(function (m) { h += '<td class="num">' + lei(valoare(liniiDin(S.comenzi[m]), "s")) + "</td>"; });
-  h += '<td class="num">' + lei(tot) + "</td><td></td></tr></tbody></table>";
+  h += '<tr class="total"><td>Total bucăți cerute</td>';
+  var totBuc = 0;
+  CHEI.forEach(function (m) {
+    var b = totalBucati(liniiDin(S.comenzi[m])); totBuc += b;
+    h += '<td class="num">' + cant(b) + "</td>";
+  });
+  h += '<td class="num">' + cant(totBuc) + '</td><td class="num">' + lei(tot) + " lei</td><td></td></tr></tbody></table>";
   box.innerHTML = h;
   return box;
 }
@@ -371,27 +400,31 @@ function tabelMagazin(mag) {
   if (!produse.length) return goliciune(MAGAZINE[mag] + " nu a trimis încă nimic pentru această livrare.");
   var box = document.createElement("div"); box.className = "tabela";
   var tab = document.createElement("table");
-  tab.innerHTML = '<thead><tr><th>Produs</th><th>U/M</th><th class="num">Cerut</th><th class="num">Livrat</th>' +
-    '<th class="num">Dif.</th><th class="num">Valoare</th></tr></thead>';
+  tab.innerHTML = '<thead><tr><th>Produs</th><th class="num">Cerut buc</th><th class="num">Livrat</th>' +
+    '<th>U/M</th><th class="num">Dif.</th><th class="num">Valoare</th></tr></thead>';
   var tb = document.createElement("tbody");
   produse.forEach(function (p) {
     var l = linii[p.nr] || {}, s = l.s || 0, liv = (l.l != null ? l.l : null);
     var tr = document.createElement("tr");
-    tr.innerHTML = "<td>" + p.nume + "</td><td>" + p.um + '</td><td class="num">' + cant(s) + "</td>";
+    tr.innerHTML = "<td>" + p.nume + '</td><td class="num">' + cant(s) + "</td>";
     var tdL = document.createElement("td"); tdL.className = "num";
+    var tdU = document.createElement("td"); tdU.textContent = p.um;
     var tdD = document.createElement("td"); tdD.className = "num";
     var tdV = document.createElement("td"); tdV.className = "num";
+    // diferenta are sens doar cand si cererea e in bucati (iaurt, oua, pungi)
+    var comparabil = p.um === "Buc";
     var inp = document.createElement("input");
-    inp.className = "liv" + (liv != null && liv !== s ? " modificat" : "");
-    inp.type = "number"; inp.inputMode = "decimal"; inp.min = "0"; inp.step = p.um === "Buc" ? "1" : "0.5";
-    inp.id = "l" + p.nr; inp.placeholder = cant(s); inp.value = (liv != null ? liv : "");
-    inp.setAttribute("aria-label", "Livrat " + p.nume);
+    inp.className = "liv";
+    inp.type = "number"; inp.inputMode = "decimal"; inp.min = "0"; inp.step = p.um === "Buc" ? "1" : "0.1";
+    inp.id = "l" + p.nr; inp.placeholder = comparabil ? cant(s) : p.um.toLowerCase();
+    inp.value = (liv != null ? liv : "");
+    inp.setAttribute("aria-label", "Livrat " + p.nume + " în " + p.um);
     var pune = function (v) {
-      var d = (v == null ? 0 : v - s);
-      tdD.textContent = d ? ((d > 0 ? "+" : "") + cant(d)) : (v == null ? "–" : "0");
+      var d = (v == null || !comparabil ? 0 : v - s);
+      tdD.textContent = !comparabil ? "–" : (d ? ((d > 0 ? "+" : "") + cant(d)) : (v == null ? "–" : "0"));
       tdD.className = "num dif" + (d ? "" : " zero");
-      tdV.textContent = lei((v == null ? s : v) * p.pret);
-      inp.classList.toggle("modificat", v != null && v !== s);
+      tdV.textContent = v == null ? "–" : lei(v * p.pret);
+      inp.classList.toggle("modificat", comparabil && v != null && v !== s);
     };
     inp.oninput = function (e) {
       var v = e.target.value === "" ? null : parseFloat(e.target.value);
@@ -401,7 +434,7 @@ function tabelMagazin(mag) {
     inp.onfocus = function () { inp.select(); };
     tdL.appendChild(inp);
     pune(liv);
-    tr.appendChild(tdL); tr.appendChild(tdD); tr.appendChild(tdV);
+    tr.appendChild(tdL); tr.appendChild(tdU); tr.appendChild(tdD); tr.appendChild(tdV);
     tb.appendChild(tr);
   });
   tab.appendChild(tb); box.appendChild(tab);
@@ -431,22 +464,28 @@ function copiaza(text) {
   } else { toast("Nu am putut copia"); }
 }
 function tsvCentralizator() {
-  var rows = [["Produs", "U/M"].concat(CHEI.map(function (m) { return MAGAZINE[m]; }), ["Total", "Pret"]).join("\t")];
+  var rows = [["Produs"].concat(CHEI.map(function (m) { return MAGAZINE[m] + " (buc)"; }),
+    ["Total buc", "Livrat", "U/M", "Pret"]).join("\t")];
   cerute().forEach(function (p) {
     var q = CHEI.map(function (m) { return (liniiDin(S.comenzi[m])[p.nr] || {}).s || 0; });
     var t = q.reduce(function (a, b) { return a + b; }, 0);
-    rows.push([p.nume, p.um].concat(q, [t, p.pret.toFixed(2)]).join("\t"));
+    var liv = CHEI.reduce(function (a, m) {
+      var l = liniiDin(S.comenzi[m])[p.nr] || {};
+      return a + (l.l != null ? l.l : 0);
+    }, 0);
+    rows.push([p.nume].concat(q, [t, liv || "", p.um, p.pret.toFixed(2)]).join("\t"));
   });
   return rows.join("\n");
 }
 function tsvMagazin(mag) {
   var linii = liniiDin(S.comenzi[mag]);
-  var rows = [["Produs", "U/M", "Cantitate", "Pret unitar", "Valoare"].join("\t")];
+  var rows = [["Produs", "Cerut buc", "Cantitate livrata", "U/M", "Pret unitar", "Valoare"].join("\t")];
   PRODUSE.forEach(function (p) {
     var l = linii[p.nr] || {};
-    var q = (l.l != null ? l.l : (l.s || 0));
-    if (!q) return;
-    rows.push([p.nume, p.um, q, p.pret.toFixed(2), (q * p.pret).toFixed(2)].join("\t"));
+    if (!(l.s > 0 || l.l > 0)) return;
+    var q = (l.l != null ? l.l : "");
+    rows.push([p.nume, l.s || "", q, p.um, p.pret.toFixed(2),
+      (q === "" ? "" : (q * p.pret).toFixed(2))].join("\t"));
   });
   return rows.join("\n");
 }

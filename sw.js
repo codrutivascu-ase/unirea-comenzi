@@ -1,6 +1,6 @@
 /* Service worker: tine aplicatia deschisa si fara semnal.
    Schimba VERSIUNE la fiecare modificare, ca telefoanele sa ia codul nou. */
-var VERSIUNE = "ug-comenzi-v1";
+var VERSIUNE = "ug-comenzi-v2";
 var FISIERE = [
   "./", "./index.html", "./app.js", "./produse.js", "./config.js",
   "./manifest.webmanifest",

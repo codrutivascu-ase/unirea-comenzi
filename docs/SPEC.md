@@ -15,9 +15,9 @@ Probleme: transcriere manuala, lipsa centralizare, lipsa istoric, erori de citir
 ## 3. Model de date
 - **magazin**: id, nume, activ
 - **produs**: nr_crt, nume, um (Kg/L/Buc), pret, categorie, activ, ordine
-- **sesiune_comanda** (ciclu): id, data_livrare, tura (1 = dimineata / 2 = seara), deadline, status (deschisa | blocata | livrata)
+- **sesiune_comanda** (ciclu): id, data_livrare, tura (1 = pranz / 2 = dimineata), deadline, status (deschisa | blocata | livrata)
 - **comanda**: id, sesiune_id, magazin_id, status (draft | trimisa | confirmata), trimisa_la, trimisa_de
-- **linie_comanda**: comanda_id, produs_id, cant_solicitata, cant_livrata, lot, observatii
+- **linie_comanda**: comanda_id, produs_id, cant_solicitata (in BUCATI), cant_livrata (in U/M: Kg, L, Buc), lot, observatii
 - **utilizator**: id, nume, rol, magazin_id, pin/parola
 
 Preturile se stocheaza *pe linie* la momentul trimiterii (snapshot), ca sa nu se schimbe istoricul
