@@ -1528,8 +1528,18 @@ deseneaza();
 porneste();
 
 if ("serviceWorker" in navigator) {
+  // Cand apare o versiune noua, pagina se reincarca singura o data,
+  // ca sa nu ramana nimeni pe cod vechi fara sa stie.
+  var reincarcat = false;
+  navigator.serviceWorker.addEventListener("controllerchange", function () {
+    if (reincarcat) return;
+    reincarcat = true;
+    location.reload();
+  });
   window.addEventListener("load", function () {
-    navigator.serviceWorker.register("sw.js").catch(function () {});
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
+      .then(function (reg) { reg.update(); })
+      .catch(function () {});
   });
 }
 })();
