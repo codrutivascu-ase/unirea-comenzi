@@ -284,7 +284,7 @@ function incarca() {
     });
     S.comenzi = noi;
     retineBaza();
-    var semn = JSON.stringify(noi) + "|" + S.runda;
+    var semn = JSON.stringify(noi) + "|" + S.runda + "|" + S.rol + "|" + S.magazin + "|" + S.pas;
     if (semn === S.semnatura) { scrieStare(); return; }   // nimic nou, nu redesenam
     S.semnatura = semn;
     deseneazaDacaSePoate();
@@ -1488,7 +1488,7 @@ $("btnIesire").onclick = function () { location.hash = ""; };
 
 function citesteHash() {
   var h = (location.hash || "").replace("#", "");
-  S.pas = "lista"; S.confirmaFinal = false;
+  S.pas = "lista"; S.confirmaFinal = false; S.semnatura = null;
   if (h === "depozit") { S.rol = "depozit"; S.magazin = null; }
   else if (MAGAZINE[h]) { S.rol = "magazin"; S.magazin = h; S.depTab = "centralizator"; incarcaFrecvente(); }
   else { S.rol = null; S.magazin = null; }
@@ -1511,7 +1511,12 @@ function incarcaFrecvente() {
   });
 }
 
-window.addEventListener("hashchange", function () { citesteHash(); porneste(); });
+window.addEventListener("hashchange", function () {
+  citesteHash();
+  S.semnatura = null;   // ecranul trebuie redesenat, chiar daca datele sunt aceleasi
+  deseneaza();
+  porneste();
+});
 window.addEventListener("online", function () { incarca(); });
 window.addEventListener("offline", function () { stareRetea(false); });
 
