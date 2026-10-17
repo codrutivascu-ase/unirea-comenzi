@@ -5,7 +5,7 @@
    valori de mai jos cu datele proiectului Supabase (Settings > API)
    si pune in Supabase tabela descrisa in docs/SUPABASE.md. */
 window.CONFIG = {
-  supabaseUrl: "",
-  supabaseKey: "",
+  supabaseUrl: "https://vvbxkorqigrjebrlrnef.supabase.co",
+  supabaseKey: "sb_publishable_bS3pm33QGfDSbeR1bAK_gw_qE4gcCAA",
   magazine: { kaufland: "Kaufland", bistrita: "Bistrița" }
 };

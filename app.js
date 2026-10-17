@@ -292,8 +292,9 @@ function scrie(mag) {
     var doc = {
       id: docId(mag), sesiune: sesiuneKey(), data: azi(), runda: S.runda, magazin: mag,
       status: c.status || "draft", linii: c.linii || {}, altele: c.altele || [],
-      modificat: modificat, actualizat: acum
+      actualizat: acum
     };
+    if (modificat) doc.modificat = modificat;
     Store.salveaza(doc).catch(function () { scrieStare(); });
     scrieStare();
   }, 450);
