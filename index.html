@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ro" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Comenzi Unirea Gospodarilor</title>
+<meta name="description" content="Comenzi între magazine și depozit — Cooperativa Agricolă Unirea Gospodarilor">
+<meta name="theme-color" content="#ffffff">
+<meta name="color-scheme" content="light">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Comenzi UG">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@600;700&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Paleta este luata din sigla cooperativei: bleumarin, verdele campului, galbenul acoperisului.
+   Aplicatia ramane alba indiferent de tema telefonului. */
+:root{
+  color-scheme:light;
+  --bg:#ffffff; --surface:#f7f7f4; --surface-2:#f0efe9; --line:#e3e1d8; --line-tare:#cfcdc2;
+  --ink:#152334; --fg:#152334; --muted:#6d7480;
+  --brand:#47704c; --brand-dark:#365939; --brand-soft:#eaf1ea;
+  --aur:#d9a441; --aur-soft:#fbf2df;
+  --rosu:#9d3427;
+  --font-display:"Bitter",Georgia,serif;
+  --font-body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --umbra:0 1px 2px rgba(21,35,52,.06), 0 6px 18px rgba(21,35,52,.05);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;min-height:100%}
+
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.45;
+  -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+img{max-width:100%}
+[hidden]{display:none!important}
+h1,h2{font-family:var(--font-display);margin:0;text-wrap:balance}
+button{font:inherit;cursor:pointer;color:inherit}
+input,select{font:inherit;color:inherit;background:var(--bg)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.gutter{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.limit{max-width:920px;margin:0 auto}
+
+/* ---- antet ---- */
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:rgba(255,255,255,.94);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-row{display:flex;align-items:center;gap:12px;padding-block:9px}
+.marca{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.marca img{width:38px;height:38px;flex:none}
+.marca .txt{min-width:0}
+.marca .coop{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700;display:block}
+.marca h1{font-size:16px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:4px 10px;border-radius:999px;
+  background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.pill.trimisa{background:var(--brand);color:#fff}
+.pill.asteapta{background:var(--aur-soft);color:#8a6414}
+.sesiune{display:flex;gap:6px;align-items:center;padding-bottom:9px;overflow-x:auto;scrollbar-width:none}
+.sesiune::-webkit-scrollbar{display:none}
+.sesiune input[type=date]{border:1px solid var(--line-tare);border-radius:9px;padding:7px 9px;font-weight:600;flex:none}
+.seg{display:inline-flex;background:var(--surface-2);border-radius:9px;padding:3px;flex:none}
+.seg button{border:0;background:transparent;border-radius:7px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--bg);color:var(--ink);box-shadow:0 1px 2px rgba(21,35,52,.12)}
+.progres{height:3px;background:var(--surface-2)}
+.progres i{display:block;height:100%;background:var(--brand);width:0;transition:width .2s ease}
+
+/* ---- bara de cautare ---- */
+.bar{display:flex;gap:8px;align-items:center;margin-top:14px}
+.search{position:relative;flex:1;min-width:0}
+.search input{width:100%;border:1px solid var(--line-tare);border-radius:11px;padding:11px 12px 11px 36px;background:var(--surface)}
+.search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2}
+.chips{display:flex;gap:6px;margin-top:10px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{border:1px solid var(--line-tare);background:var(--bg);color:var(--muted);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;white-space:nowrap;flex:none}
+.chip[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chip .cnt{display:inline-block;margin-left:5px;font-family:var(--font-mono);font-size:11px;opacity:.75}
+
+.btn{border:1px solid var(--line-tare);background:var(--bg);border-radius:11px;padding:10px 14px;font-weight:600;white-space:nowrap}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:disabled{background:var(--surface-2);border-color:var(--line);color:var(--muted)}
+.btn.mic{padding:8px 11px;font-size:13px}
+
+/* ---- lista produse ---- */
+.grup{margin-top:20px}
+.grup h2{font-family:var(--font-body);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  font-weight:700;display:flex;align-items:center;gap:8px}
+.grup h2::after{content:"";flex:1;height:1px;background:var(--line)}
+.rand{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.rand .info{flex:1;min-width:0}
+.rand .nume{font-weight:600;overflow-wrap:anywhere}
+.rand .sub{font-size:12px;color:var(--muted);font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.rand.plin{background:var(--brand-soft);border-radius:12px;padding-inline:10px;border-bottom-color:transparent;box-shadow:inset 3px 0 0 var(--brand)}
+.rand.plin .sub{color:var(--brand-dark)}
+.stepper{display:flex;align-items:center;gap:0;border:1px solid var(--line-tare);border-radius:11px;overflow:hidden;background:var(--bg);flex:none}
+.stepper button{border:0;background:transparent;width:36px;height:42px;font-size:19px;font-weight:600;color:var(--muted);line-height:1}
+.stepper button:active{background:var(--surface-2)}
+.stepper input{width:62px;height:42px;border:0;border-left:1px solid var(--line);border-right:1px solid var(--line);
+  text-align:center;font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:16px;font-weight:600;
+  -moz-appearance:textfield}
+.stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.rand.plin .stepper{border-color:var(--brand)}
+.um{font-size:11px;color:var(--muted);width:24px;text-align:left;flex:none}
+
+/* ---- bara de jos ---- */
+footer.act{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);
+  border-top:1px solid var(--line);padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+.act-in{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.sumar{font-size:12.5px;color:var(--muted);font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.sumar b{display:block;font-size:17px;color:var(--ink);font-family:var(--font-body)}
+.act-btns{display:flex;gap:8px}
+
+/* ---- depozit ---- */
+.carduri{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px}
+.card .et{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.card .val{font-family:var(--font-mono);font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+.card .val small{font-family:var(--font-body);font-size:12px;color:var(--muted);font-weight:400}
+.card .st{font-size:12px;color:var(--muted);margin-top:3px}
+.card.gata{border-color:var(--brand);background:var(--brand-soft)}
+.tabela{overflow-x:auto;margin-top:14px;border:1px solid var(--line);border-radius:14px;background:var(--bg);box-shadow:var(--umbra)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:9px 11px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);background:var(--surface-2);font-weight:700}
+td.num,th.num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+tbody tr:last-child td{border-bottom:0}
+tr.total td{font-weight:700;background:var(--surface-2)}
+tr.cat td{background:var(--bg);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;padding-top:12px}
+input.liv{width:78px;text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  border:1px solid var(--line-tare);border-radius:8px;padding:6px 8px;font-weight:600}
+input.liv.modificat{border-color:var(--aur);background:var(--aur-soft)}
+.dif{font-weight:700;color:var(--rosu)}
+.dif.zero{font-weight:400;color:var(--muted)}
+.gol{padding:26px 16px;text-align:center;color:var(--muted)}
+
+/* ---- ecran de intrare ---- */
+.gate{max-width:520px;margin:0 auto;padding-block:36px 24px;text-align:center}
+.gate img.logo{width:104px;height:104px;margin-bottom:14px}
+.gate h1{font-size:26px;margin-bottom:6px}
+.gate p.lead{color:var(--muted);margin:0 0 22px}
+.gate a{display:flex;align-items:center;justify-content:space-between;gap:10px;text-decoration:none;color:inherit;text-align:left;
+  background:var(--bg);border:1px solid var(--line-tare);border-radius:14px;padding:15px 17px;margin-bottom:10px;
+  font-weight:700;box-shadow:var(--umbra)}
+.gate a small{display:block;font-weight:400;color:var(--muted);font-size:12.5px}
+.gate a .sag{color:var(--brand);font-size:18px}
+.gate a.dep{border-color:var(--brand);background:var(--brand-soft)}
+.nota{color:var(--muted);font-size:12.5px;text-align:left;border-left:2px solid var(--line-tare);padding-left:12px;margin-top:20px}
+
+.banner{margin-top:12px;background:var(--aur-soft);border:1px solid #efd9a8;border-radius:12px;padding:10px 13px;font-size:13px;color:#7a5a12;
+  display:flex;gap:10px;align-items:center;justify-content:space-between}
+.banner button{border:0;background:transparent;font-weight:700;color:#7a5a12}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:50;
+  background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;
+  box-shadow:0 8px 24px rgba(21,35,52,.3);max-width:88vw;text-align:center}
+@media (prefers-reduced-motion:no-preference){
+  .toast{animation:pop .2s ease-out}
+  @keyframes pop{from{opacity:0;transform:translate(-50%,10px)}}
+}
+main{padding-bottom:120px}
+</style>
+</head>
+<body>
+
+<header class="top" id="antet" hidden>
+  <div class="limit gutter">
+    <div class="top-row">
+      <div class="marca">
+        <img src="assets/logo.png" alt="" width="38" height="38">
+        <div class="txt">
+          <span class="coop">Cooperativa Unirea</span>
+          <h1 id="titlu">Comenzi</h1>
+        </div>
+      </div>
+      <span class="pill" id="statusPill">&mdash;</span>
+      <button class="btn mic" id="btnIesire" type="button" title="Schimbă rolul">&#9776;</button>
+    </div>
+    <div class="sesiune">
+      <input type="date" id="dataLivrare" aria-label="Data livrării">
+      <div class="seg" id="segTura">
+        <button type="button" data-tura="t1">Dimineață</button>
+        <button type="button" data-tura="t2">Seară</button>
+      </div>
+    </div>
+  </div>
+  <div class="progres"><i id="progresBar"></i></div>
+</header>
+
+<div class="limit gutter">
+
+  <section id="gate" class="gate" hidden>
+    <img class="logo" src="assets/logo.png" alt="Cooperativa Agricolă Unirea Gospodarilor">
+    <h1>Comenzi către depozit</h1>
+    <p class="lead">Alege de unde intri. Salvează linkul pe ecranul telefonului și îl deschizi ca pe o aplicație.</p>
+    <a href="#kaufland">
+      <span>Magazin Kaufland <small>introduce comanda zilnică</small></span><span class="sag">&rarr;</span>
+    </a>
+    <a href="#bistrita">
+      <span>Magazin Bistrița <small>introduce comanda zilnică</small></span><span class="sag">&rarr;</span>
+    </a>
+    <a href="#depozit" class="dep">
+      <span>Depozit <small>centralizator de producție și livrare</small></span><span class="sag">&rarr;</span>
+    </a>
+    <p class="nota" id="notaMod">Se încarcă...</p>
+  </section>
+
+  <main id="magazinView" hidden>
+    <div class="bar">
+      <label class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="cauta" type="search" placeholder="Caută produs..." aria-label="Caută produs">
+      </label>
+      <button class="btn mic" id="copiazaAnterioara" type="button">Ca ieri</button>
+    </div>
+    <div class="chips" id="categorii"></div>
+    <div id="lista"></div>
+  </main>
+
+  <main id="depozitView" hidden>
+    <div class="carduri" id="statusMagazine"></div>
+    <div class="chips" id="depTabs"></div>
+    <div id="depozitContinut"></div>
+  </main>
+
+</div>
+
+<footer class="act gutter" id="actiuni" hidden>
+  <div class="limit act-in">
+    <div class="sumar" id="sumar">&mdash;</div>
+    <div class="act-btns">
+      <button class="btn" id="btnSecundar" type="button" hidden></button>
+      <button class="btn primary" id="btnPrincipal" type="button">Trimite comanda</button>
+    </div>
+  </div>
+</footer>
+
+<script src="config.js"></script>
+<script src="produse.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
