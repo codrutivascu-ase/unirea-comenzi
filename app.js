@@ -1075,7 +1075,6 @@ function finalizeazaRunda() {
     if (!c) return;
     intrare.m[m] = { p: pozitiiComanda(c), v: Math.round(valoare(liniiDin(c), "l") * 100) / 100 };
   });
-  copiaza(tsvLivrare());
   var istoric = [intrare].concat(S.istoric || []).slice(0, 60);
   Store.scrieSetare("istoric", istoric).then(function () {
     S.istoric = istoric;
@@ -1088,7 +1087,7 @@ function finalizeazaRunda() {
     S.baza = {}; S.semnatura = null;
     return incarca();
   }).then(function () {
-    toast("Comandă livrată · exportul e copiat pentru SmartBill");
+    toast("Comandă livrată");
   }).catch(function () { toast("Nu am putut finaliza. Încearcă din nou."); });
 }
 
@@ -1165,12 +1164,6 @@ function deseneazaDetaliuIstoric(loc, it, map) {
   });
 
   var bare = document.createElement("div"); bare.className = "istoric-butoane";
-
-  var smart = document.createElement("button");
-  smart.className = "btn mic primary"; smart.type = "button";
-  smart.textContent = "Trimite către SmartBill";
-  smart.onclick = function () { copiaza(tsvLivrare(map)); };
-  bare.appendChild(smart);
 
   var edit = document.createElement("button");
   edit.className = "btn mic"; edit.type = "button";
@@ -1510,35 +1503,6 @@ function toast(t) {
   var el = document.createElement("div"); el.className = "toast"; el.textContent = t;
   document.body.appendChild(el);
   setTimeout(function () { el.remove(); }, 2600);
-}
-function copiaza(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(
-      function () { toast("Copiat — lipește în Excel sau SmartBill"); },
-      function () { toast("Nu am putut copia"); }
-    );
-  } else { toast("Nu am putut copia"); }
-}
-/* Un singur export, cu magazinul pe fiecare rand: se filtreaza usor in Excel
-   si se poate imparti pe avize. */
-function tsvLivrare(sursa) {
-  var set = sursa || S.comenzi;
-  var rows = [["Magazin", "Produs", "Cerut buc", "Cantitate livrata", "U/M", "Pret unitar", "Valoare"].join("\t")];
-  CHEI.forEach(function (m) {
-    var linii = liniiDin(set[m]);
-    S.tot.forEach(function (p) {
-      var l = linii[p.nr] || {};
-      if (!(l.s > 0 || l.l > 0)) return;
-      var q = (l.l != null ? l.l : "");
-      rows.push([MAGAZINE[m], p.nume, l.s || "", q, p.um,
-        p.pret != null ? p.pret.toFixed(2) : "",
-        (q === "" || p.pret == null ? "" : (q * p.pret).toFixed(2))].join("\t"));
-    });
-    alteleDin(set[m]).forEach(function (it) {
-      rows.push([MAGAZINE[m], it.t, it.s || 1, "", "buc", "", ""].join("\t"));
-    });
-  });
-  return rows.join("\n");
 }
 
 $("btnPrincipal").onclick = function () {

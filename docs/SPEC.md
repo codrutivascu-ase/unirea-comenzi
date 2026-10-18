@@ -2,7 +2,7 @@
 
 ## 1. Problema actuala
 Lista de produse pe hartie (47 pozitii), trimisa de 2x/zi catre depozit. Vanzatoarele scriu
-cantitatea solicitata; depozitul produce si livreaza a doua zi dimineata, cu aviz SmartBill + NIR.
+cantitatea solicitata; depozitul produce si livreaza a doua zi dimineata, cu aviz + NIR.
 Probleme: transcriere manuala, lipsa centralizare, lipsa istoric, erori de citire.
 
 ## 2. Utilizatori si roluri
@@ -34,7 +34,7 @@ cand modifici catalogul.
 5. Depozitul completeaza cantitatea livrata si lotul, pe magazin. Diferentele (solicitat vs livrat)
    sunt evidentiate.
 6. Export: PDF "Nota de comanda / Dispozitie de livrare / Aviz de insotire" identic cu formularul
-   actual (un PDF per magazin), + CSV/XLSX pentru import in SmartBill.
+   actual (un PDF per magazin).
 
 ## 5. Ecrane
 **Vanzator (mobil)**
@@ -59,9 +59,11 @@ cand modifici catalogul.
   pentru 3-5 utilizatori. Depozitul vede comenzile in timp real, fara refresh.
 - **Hosting**: GitHub Pages sau Vercel (gratuit), cod pe GitHub.
 - Alternativa fara backend propriu: Google Sheets ca baza de date — mai fragil, nu recomand.
-- SmartBill are API de facturare; integrarea directa (aviz generat automat) e posibila ca faza 2.
+- Fara legatura cu programul de gestiune. Magazinele sunt gestiuni ale aceleiasi firme, deci
+  miscarea marfii e un transfer intern, nu o vanzare, si se face manual acolo. Aplicatia se
+  opreste la comanda si centralizator.
 
 ## 7. Etape
 - **Faza 1 (MVP)**: catalog, introducere comanda, trimitere, centralizator depozit, export PDF/Excel.
 - **Faza 2**: cantitate livrata + lot, diferente, istoric si rapoarte (consum pe produs/saptamana).
-- **Faza 3**: integrare SmartBill (aviz automat), sugestie cantitate pe baza istoricului.
+- **Faza 3**: sugestie cantitate pe baza istoricului.

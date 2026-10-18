@@ -41,8 +41,10 @@ Pe telefon: deschizi linkul în Chrome (Android) sau Safari (iPhone) → meniu �
 1. **Supabase** — pasul care face aplicația utilizabilă în două locuri deodată.
    Instrucțiuni în [docs/SUPABASE.md](docs/SUPABASE.md).
 2. **Aviz PDF** în formatul actual („Notă de comandă / Dispoziție de livrare").
-3. **Integrare SmartBill**: avizul emis direct din aplicație.
-4. **Parolă pe depozit**, când nu mai vrem ca oricine cu linkul să poată finaliza o comandă.
+3. **Parolă pe depozit**, când nu mai vrem ca oricine cu linkul să poată finaliza o comandă.
+
+Avizul și NIR-ul se fac mai departe în programul de gestiune, manual. Aplicația se
+oprește la comandă și centralizator.
 
 ## Ce se întâmplă când cade internetul
 
