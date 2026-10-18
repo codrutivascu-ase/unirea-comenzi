@@ -244,6 +244,7 @@ function recalculeazaCatalog() {
   // S.catalog = ce e in lista acum, S.active = ce vad magazinele azi.
   S.tot = CATALOG_BAZA.concat(extra);
   S.catalog = S.tot.filter(function (p) { return sterse.indexOf(p.nr) < 0; });
+  S.catalog.sort(function (a, b) { return a.nume.localeCompare(b.nume, "ro"); });
   S.active = S.catalog.filter(function (p) { return dez.indexOf(p.nr) < 0; });
   var cat = CATEGORII_BAZA.slice();
   S.catalog.forEach(function (p) { if (cat.indexOf(p.categorie) < 0) cat.push(p.categorie); });
