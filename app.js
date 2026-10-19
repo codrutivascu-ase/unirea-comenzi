@@ -243,8 +243,8 @@ function recalculeazaCatalog() {
   // S.tot = tot ce a existat vreodata (ca sa putem citi comenzi vechi),
   // S.catalog = ce e in lista acum, S.active = ce vad magazinele azi.
   S.tot = CATALOG_BAZA.concat(extra);
+  S.tot.sort(function (a, b) { return a.nume.localeCompare(b.nume, "ro"); });
   S.catalog = S.tot.filter(function (p) { return sterse.indexOf(p.nr) < 0; });
-  S.catalog.sort(function (a, b) { return a.nume.localeCompare(b.nume, "ro"); });
   S.active = S.catalog.filter(function (p) { return dez.indexOf(p.nr) < 0; });
   var cat = CATEGORII_BAZA.slice();
   S.catalog.forEach(function (p) { if (cat.indexOf(p.categorie) < 0) cat.push(p.categorie); });
@@ -824,7 +824,7 @@ function blocAltele(c) {
 
   var adaug = document.createElement("div"); adaug.className = "adauga";
   var text = document.createElement("input");
-  text.type = "text"; text.placeholder = "ex. mop, clor, pixuri"; text.id = "altText";
+  text.type = "text"; text.placeholder = "ex. etichete"; text.id = "altText";
   text.setAttribute("aria-label", "Produs nou");
   var buton = document.createElement("button");
   buton.className = "btn mic"; buton.type = "button"; buton.textContent = "Adaugă";
@@ -1358,6 +1358,9 @@ function formularProdusNou() {
 function tabelCentralizator() {
   var produse = cerute();
   if (!produse.length) return goliciune("Niciun magazin nu a cerut încă ceva pentru comanda curentă.");
+  produse = produse.slice().sort(function (a, b) {
+    return S.categorii.indexOf(a.categorie) - S.categorii.indexOf(b.categorie);
+  });
   var box = document.createElement("div"); box.className = "tabela";
   var h = "<table><thead><tr><th>Produs</th>";
   CHEI.forEach(function (m) { h += '<th class="num">' + MAGAZINE[m] + "</th>"; });
@@ -1415,6 +1418,9 @@ function tabelMagazin(mag) {
     return l.s > 0 || l.l > 0 || !!(b && b.l[p.nr]);
   });
   if (!produse.length) return goliciune(MAGAZINE[mag] + " nu a trimis încă nimic pentru comanda curentă.");
+  produse = produse.slice().sort(function (a, b2) {
+    return S.categorii.indexOf(a.categorie) - S.categorii.indexOf(b2.categorie);
+  });
   var box = document.createElement("div"); box.className = "tabela" + (blocat ? " blocat" : "");
   if (blocat) {
     var nt = document.createElement("p"); nt.className = "tabela-tit";
@@ -1423,9 +1429,16 @@ function tabelMagazin(mag) {
   }
   var tab = document.createElement("table");
   tab.innerHTML = '<thead><tr><th>Produs</th><th class="num">Cerut buc</th><th class="num">Livrat</th>' +
-    '<th>U/M</th><th class="num">Dif.</th><th class="num">Valoare</th></tr></thead>';
+    '<th>U/M</th><th class="num">Valoare</th></tr></thead>';
   var tb = document.createElement("tbody");
+  var catCurenta = null;
   produse.forEach(function (p) {
+    if (p.categorie !== catCurenta) {
+      catCurenta = p.categorie;
+      var trc = document.createElement("tr"); trc.className = "cat";
+      var tdc = document.createElement("td"); tdc.colSpan = 5; tdc.textContent = catCurenta;
+      trc.appendChild(tdc); tb.appendChild(trc);
+    }
     var l = linii[p.nr] || {}, s = l.s || 0, liv = (l.l != null ? l.l : null);
     var marca = schimbatLa(mag, p.nr);
     var tr = document.createElement("tr");
@@ -1433,9 +1446,7 @@ function tabelMagazin(mag) {
     tr.innerHTML = "<td>" + p.nume + '</td><td class="num ' + marca + '">' + cant(s) + "</td>";
     var tdL = document.createElement("td"); tdL.className = "num";
     var tdU = document.createElement("td"); tdU.textContent = p.um;
-    var tdD = document.createElement("td"); tdD.className = "num";
     var tdV = document.createElement("td"); tdV.className = "num";
-    // diferenta are sens doar cand si cererea e in bucati (iaurt, oua, pungi)
     var comparabil = p.um === "Buc";
     var inp = document.createElement("input");
     inp.className = "liv";
@@ -1445,9 +1456,6 @@ function tabelMagazin(mag) {
     inp.setAttribute("aria-label", "Livrat " + p.nume + " în " + p.um);
     inp.disabled = blocat;
     var pune = function (v) {
-      var d = (v == null || !comparabil ? 0 : v - s);
-      tdD.textContent = !comparabil ? "–" : (d ? ((d > 0 ? "+" : "") + cant(d)) : (v == null ? "–" : "0"));
-      tdD.className = "num dif" + (d ? "" : " zero");
       tdV.textContent = (v == null || p.pret == null) ? "–" : lei(v * p.pret);
       inp.classList.toggle("modificat", comparabil && v != null && v !== s);
     };
@@ -1459,7 +1467,7 @@ function tabelMagazin(mag) {
     inp.onfocus = function () { inp.select(); };
     tdL.appendChild(inp);
     pune(liv);
-    tr.appendChild(tdL); tr.appendChild(tdU); tr.appendChild(tdD); tr.appendChild(tdV);
+    tr.appendChild(tdL); tr.appendChild(tdU); tr.appendChild(tdV);
     tb.appendChild(tr);
   });
   tab.appendChild(tb); box.appendChild(tab);

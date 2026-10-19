@@ -59,6 +59,9 @@ window.PRODUSE = [
 {"nr":58,"nume":"Role casă de marcat","um":"Buc","pret":null,"categorie":"Diverse"},
 {"nr":59,"nume":"Hârtie pentru Z","um":"Buc","pret":null,"categorie":"Diverse"}
 ];
-window.CATEGORII = ["Carne pui","Carne porc","Carmangerie","Lactate","Ouă","Diverse"];
+window.CATEGORII = ["Carmangerie","Lactate","Carne pui","Ouă","Carne porc","Cămară","Diverse"];
 /* categoriile fara niciun produs apar cu o nota, ca sa stim ca locul e rezervat */
-window.NOTA_CATEGORIE = { "Carne porc": "Se completează când avem carne proaspătă." };
+window.NOTA_CATEGORIE = {
+  "Carne porc": "Se completează când avem carne proaspătă.",
+  "Cămară": "Se completează ulterior."
+};
