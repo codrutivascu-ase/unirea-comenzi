@@ -409,9 +409,19 @@ function retineBaza() {
   if (S.rol !== "depozit") return;
   var nou = false;
   CHEI.forEach(function (m) {
-    if (S.comenzi[m] && !S.baza[m]) { S.baza[m] = instantaneu(S.comenzi[m]); nou = true; }
+    var c = S.comenzi[m];
+    if (!c) return;
+    // pana incepe depozitul sa completeze "Livrat", orice adaugare intra in baza fara marcaj
+    if (!S.baza[m] || !aInceputLivrarea(c)) {
+      var inst = instantaneu(c);
+      if (JSON.stringify(inst) !== JSON.stringify(S.baza[m])) { S.baza[m] = inst; nou = true; }
+    }
   });
   if (nou) salveazaBaza();
+}
+function aInceputLivrarea(c) {
+  var linii = liniiDin(c);
+  return Object.keys(linii).some(function (nr) { return linii[nr].l != null; });
 }
 function confirmaBaza() {
   CHEI.forEach(function (m) { if (S.comenzi[m]) S.baza[m] = instantaneu(S.comenzi[m]); });
